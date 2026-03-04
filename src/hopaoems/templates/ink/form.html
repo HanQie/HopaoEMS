@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{% set header_actions %}
+{{ F.ui_button(label=t('common.back'), variant='secondary', href=url_for('ui_ink.ink_list'), icon='arrow-left') }}
+{% endset %}
+
+{{ L.ui_page_header(
+title=t('ink.form.title'),
+actions=header_actions
+) }}
+
+{% call L.ui_container() %}
+{% call L.ui_grid(cols=1) %}
+{% call C.ui_card() %}
+{% call F.ui_form(method='POST', spacing=6) %}
+{{ F.ui_input(name='date', label=t('ink.fields.date'), type='date', value=ink.date if ink else '', required=True) }}
+{{ F.ui_input(name='type', label=t('ink.fields.type'), value=ink.type if ink else '', required=True) }}
+{{ F.ui_input(name='color', label=t('ink.fields.color'), value=ink.color if ink else '', required=True) }}
+{{ F.ui_input(name='qty', label=t('ink.fields.qty'), type='number', u_props='step="0.01"', value=ink.qty if ink else
+'', required=True) }}
+{{ F.ui_textarea(name='note', label=t('common.note'), value=ink.note if ink else '') }}
+
+{% call L.ui_form_footer() %}
+{{ F.ui_button(label=t('common.cancel'), variant='secondary', href=url_for('ui_ink.ink_list'), icon='arrow-left') }}
+{{ F.ui_button(label=t('common.submit'), type='submit', variant='primary', icon='check-lg', u_props='data-hook="ink-submit"') }}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endblock %}

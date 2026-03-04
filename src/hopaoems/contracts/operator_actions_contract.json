@@ -1,0 +1,245 @@
+{
+  "operator_only_endpoints": [
+    {
+      "endpoint": "ui_production.production_task_produce",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_production.production_task_done",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_fabric.stock_in_form",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "endpoint": "ui_fabric.stock_in_commit",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_wash.wash_commit",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_wash.wash_revoke",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_order.order_new",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_order.order_edit",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_order.task_reopen",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_order.order_item_delete",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_order.order_delete",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_fabric.roll_adjust_stock",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_fabric.roll_deplete",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_fabric.roll_delete",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_fabric.cylinder_delete",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_fabric.fabric_new",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_sample.sample_edit",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_sample.sample_delete",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_sample.sample_pick_color",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_ink.ink_new",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_ink.ink_edit",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_ink.ink_delete",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_sample.sample_save_corrections",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_sample.color_corrections_clear",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_fabric.fabric_edit",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_fabric.cylinder_edit",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_fabric.roll_edit",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_wash.wash_log_undo",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_production.production_log_edit",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_production.production_log_delete",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui_production.production_log_undo_wash",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "ui.debug_build_info",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "endpoint": "ui.debug_i18n",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "endpoint": "ui.debug_whoami",
+      "methods": [
+        "GET"
+      ]
+    }
+  ],
+  "forbidden_hooks": [
+    "data-hook=\"done-button\"",
+    "data-hook=\"wash-button\"",
+    "data-hook=\"produce-button\"",
+    "data-hook=\"adjust-stock-button\"",
+    "data-hook=\"edit-order-button\"",
+    "data-hook=\"new-order-button\"",
+    "data-hook=\"reopen-task-button\"",
+    "data-hook=\"new-ink-button\"",
+    "data-hook=\"edit-ink-button\"",
+    "data-hook=\"ink-submit\"",
+    "data-hook=\"color-corrections-save\"",
+    "data-hook=\"color-corrections-clear\"",
+    "data-hook=\"color-correction-delete\"",
+    "data-hook=\"delete-order-button\""
+  ]
+}

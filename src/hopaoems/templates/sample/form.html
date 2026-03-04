@@ -1,0 +1,279 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/components.html' as C %}
+
+{% block content %}
+{% call L.ui_container(u_props='data-hook="sample-form-root"') %}
+
+{# ── A) Page Header (Cancel only) ── #}
+{% set header_actions %}
+{{ F.ui_button(label=t('common.cancel'), variant='secondary',
+href=url_for('ui_sample.sample_list'), icon='arrow-left') }}
+{% endset %}
+{{ L.ui_page_header(
+title=t('sample.new.title') if not sample else t('sample.edit.title'),
+actions=header_actions) }}
+
+{# ── B) Main Form ── #}
+{% call F.ui_form(id='sample-form', method='POST', enctype='multipart/form-data', spacing=4) %}
+{% call L.ui_box(hook_class='ui-form-layout') %}
+
+{# ── Left: Preview / Upload ── #}
+{% set upload_btn %}
+{% call L.ui_box(hook_class='relative overflow-hidden cursor-pointer') %}
+{{ F.ui_button(label=t('common.upload_file'), variant='neutral', size='xs',
+icon='cloud-arrow-up', u_props='style="pointer-events: none;"') }}
+<input id="preview_image" name="preview_image" type="file" title="{{ t('sample.fields.preview_image') }}"
+    style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;"
+    data-hook="sample-preview-file" accept="image/png, image/jpeg, image/tiff">
+{% endcall %}
+{% endset %}
+{% call L.ui_stack(direction='col', spacing=2, align='stretch', hook_class='w-full') %}
+{% call C.ui_card(title=t('sample.preview_upload'), actions=upload_btn) %}
+{{ C.ui_sample_preview_compact(
+initial_src=sample.preview_path if sample and sample.preview_path else None,
+hook_class='ui-sample-preview-responsive') }}
+{% endcall %}
+{# Meta Subtitle for Visual Balance #}
+{% if sample and (sample.fabric_no or sample.version) %}
+{% call L.ui_stack(direction='row', spacing=2, justify='center', hook_class='opacity-70') %}
+{% if sample.fabric_no %}
+{{ C.ui_text(text=t('fabric.fields.fabric_no') ~ ': ' ~ sample.fabric_no, variant='small', tone='subtle',
+hook_class='font-mono') }}
+{% endif %}
+{% if sample.fabric_no and sample.version %}
+{{ C.ui_text(text='|', variant='small', tone='subtle') }}
+{% endif %}
+{% if sample.version %}
+{{ C.ui_text(text=t('sample.fields.version') ~ ': ' ~ sample.version, variant='small', tone='subtle',
+hook_class='font-mono') }}
+{% endif %}
+{% endcall %}
+{% endif %}
+{% endcall %}
+
+{# ── Right: Info + Color Corrections ── #}
+{% call L.ui_stack(direction='col', spacing=4, align='stretch', hook_class='w-full') %}
+
+{# Basic Info card #}
+{% call C.ui_card(title=t('sample.basic_info')) %}
+{% call L.ui_stack(direction='col', spacing=3) %}
+
+{# Row 1-2: 6 primary fields (Dates First) #}
+{% call L.ui_grid(cols=3, gap=3) %}
+{{ F.ui_input(name='date_received', label=t('sample.fields.date_received'),
+type='date', value=sample.date_received if sample else '') }}
+{{ F.ui_input(name='sampled_date', label=t('sample.fields.sampled_date'),
+type='date', value=sample.sampled_date if sample else '') }}
+{{ F.ui_input(name='version', label=t('sample.fields.version'),
+value=sample.version if sample else '') }}
+
+{{ F.ui_input(name='sample_no', label=t('sample.fields.no'), required=True,
+value=sample.sample_no if sample else '') }}
+{{ F.ui_input(name='fabric_no', label=t('fabric.fields.fabric_no'),
+value=sample.fabric_no if sample else '') }}
+{{ F.ui_input(name='title', label=t('sample.fields.title'), required=True,
+value=sample.title if sample else '') }}
+{% endcall %}
+
+{# Row 3: 2 secondary fields (print env + print filename) #}
+{% call L.ui_grid(cols=2, gap=3) %}
+{{ F.ui_input(name='printing_environment',
+label=t('sample.fields.printing_environment'),
+value=sample.printing_environment if sample else '') }}
+{{ F.ui_input(name='printing_file_name',
+label=t('sample.fields.printing_file_name'),
+value=sample.printing_file_name if sample else '') }}
+{% endcall %}
+
+{# Remark: compact 2-row textarea #}
+{{ F.ui_textarea(name='remark', label=t('common.remark'), rows=2,
+value=sample.remark if sample else '') }}
+
+{% endcall %}
+{% endcall %}
+
+{# Color Corrections inline section #}
+{% set cc_header_actions %}
+{% call L.ui_stack(direction='row', spacing=2, align='center') %}
+{% call C.ui_text(variant='small', tone='subtle',
+u_props='data-hook="sample-selections-count" data-pattern="' ~ t('sample.color_corrections.selection_count',
+count='{count}') ~ '"') %}
+{{ t('sample.color_corrections.selection_count', count=color_maps|length if color_maps else 0) }}
+{% endcall %}
+{% if is_operator() %}
+{{ F.ui_button(label=t('sample.color_corrections.add'), variant='secondary',
+size='xs', icon='plus',
+u_props='data-hook="sample-add-selection" data-action="cc-add"') }}
+{% endif %}
+{% endcall %}
+{% endset %}
+{% call C.ui_card(title=t('sample.section.adjustments'), actions=cc_header_actions) %}
+
+{# Error #}
+{% call C.ui_alert(tone='danger', u_props='data-hook="cc-error" hidden') %}
+<span data-hook="cc-error-msg"></span>
+{% endcall %}
+
+{# Empty state — one line, minimal height #}
+{% call L.ui_box(hook_class='py-2', u_props='data-hook="cc-empty"') %}
+{{ C.ui_text(text=t('sample.color_corrections.empty.title'), variant='small', tone='neutral', bold=True) }}
+{{ C.ui_text(text=t('sample.corrections.empty_hint'), variant='small', tone='subtle') }}
+{% endcall %}
+
+{# Corrections List — compact rows #}
+{% call L.ui_box(hook_class='ui-cc-list', u_props='data-hook="cc-table" ' ~ ('hidden' if not color_maps else '')) %}
+{# Re-using cc-tbody hook to satisfy JS #}
+{% call L.ui_box(hook_class='ui-cc-list', u_props='data-hook="cc-tbody"') %}
+{% if color_maps %}
+{% for cm in color_maps %}
+{% call L.ui_box(hook_class='ui-cc-row', u_props='data-hook="cc-row"') %}
+{# Summary Line #}
+{% call L.ui_stack(direction='row', align='center', justify='between') %}
+{# Left: Source Swatch & RGB #}
+{% call L.ui_stack(direction='row', align='center', spacing=2) %}
+{{ C.ui_swatch(color=cm.hex, u_props='data-hook="row-source-swatch"') }}
+{{ C.ui_text(text='RGB ' ~ cm.rgb_r ~ ', ' ~ cm.rgb_g ~ ', ' ~ cm.rgb_b,
+variant='small', tone='subtle', u_props='data-hook="cc-row-rgb"', hook_class='tabular-nums') }}
+{% endcall %}
+<input type="hidden" name="cc_r" value="{{ cm.rgb_r }}">
+<input type="hidden" name="cc_g" value="{{ cm.rgb_g }}">
+<input type="hidden" name="cc_b" value="{{ cm.rgb_b }}">
+
+{# Center: Target Summary #}
+<div data-hook="cc-collapsed-view">
+    {% set mode_label = t('sample.color_corrections.mode.note') if cm.target_mode == 'note' else
+    t('sample.color_corrections.mode.lab') %}
+    {% set summary_val = (cm.target_note|truncate(20)) if cm.target_mode == 'note' else
+    ((cm.target_l|string ~ ', ' ~ cm.target_a|string ~ ', ' ~ cm.target_b|string) if cm.target_l else
+    '-') %}
+    {{ C.ui_text(text=mode_label ~ ': ' ~ summary_val, variant='small', tone='neutral',
+    hook_class='font-medium', u_props='data-hook="cc-summary-val"') }}
+</div>
+
+{# Right: Actions #}
+{% call L.ui_stack(direction='row', spacing=1) %}
+{{ F.ui_icon_button(icon='pencil', variant='ghost', title=t('common.edit'),
+u_props='data-action="cc-toggle-detail"') }}
+{{ F.ui_icon_button(icon='trash', variant='ghost', hook_class='text-rose-500 hover:bg-rose-50
+hover:text-rose-700', title=t('common.delete'),
+u_props='data-action="cc-remove-row"') }}
+{% endcall %}
+</div>
+
+{# Expanded Editor View #}
+<div data-hook="cc-expanded-view" hidden>
+    {% call L.ui_stack(spacing=2) %}
+    {% call L.ui_stack(direction='row', spacing=4) %}
+    {% set row_mode_name = "mode_" ~ (cm.id if cm.id else "new_" ~ loop.index) %}
+    {{ F.ui_radio(name=row_mode_name, value="lab",
+    label=t('sample.color_corrections.mode.lab'),
+    checked=(cm.target_mode=='lab' or not cm.target_mode),
+    u_props='data-action="cc-mode"') }}
+    {{ F.ui_radio(name=row_mode_name, value="note",
+    label=t('sample.color_corrections.mode.note'),
+    checked=(cm.target_mode=='note'),
+    u_props='data-action="cc-mode"') }}
+    <input type="hidden" name="cc_mode" value="{{ cm.target_mode or 'lab' }}">
+    {% endcall %}
+    {% call L.ui_stack(u_props='data-hook="cc-lab-block" ' ~ ('hidden' if cm.target_mode == 'note' else ''))
+    %}
+    {% call L.ui_grid(cols=3, gap=2) %}
+    {{ F.ui_input(name="cc_l", value=cm.target_l, placeholder='L*', size='xs') }}
+    {{ F.ui_input(name="cc_a", value=cm.target_a, placeholder='a*', size='xs') }}
+    {{ F.ui_input(name="cc_b2", value=cm.target_b, placeholder='b*', size='xs') }}
+    {% endcall %}{% endcall %}
+    {% call L.ui_stack(u_props='data-hook="cc-note-block" ' ~ ('hidden' if cm.target_mode != 'note' else
+    '')) %}
+    {{ F.ui_input(name="cc_note", value=cm.target_note,
+    placeholder=t('sample.color_corrections.fields.note')) }}
+    {% endcall %}
+    {% endcall %}
+    {% endcall %}
+    {% endcall %}
+    {% endfor %}
+    {% endif %}
+    {% endcall %}
+    {% endcall %}
+
+    {% endcall %}{# /cc card #}
+
+    {% endcall %}{# /right stack #}
+
+    {% endcall %}{# /ui-form-layout #}
+
+    {# ── C) Bottom Action Row (non-sticky) ── #}
+    {% call L.ui_form_footer() %}
+    {{ F.ui_button(label=t('common.cancel'), variant='secondary',
+    href=url_for('ui_sample.sample_list'), icon='arrow-left') }}
+    {{ F.ui_button(label=t('common.submit'), type='submit', variant='primary', icon='check-lg',
+    u_props='data-hook="color-corrections-save"') }}
+    {% endcall %}
+
+    {% endcall %}{# /ui_form #}
+
+    {# JS Clone Template #}
+    <template data-hook="cc-row-template">
+        {% call L.ui_box(hook_class='ui-cc-row', u_props='data-hook="cc-row"') %}
+        {# Summary Line #}
+        {% call L.ui_stack(direction='row', align='center', justify='between') %}
+        {# Left: Source Swatch & RGB #}
+        {% call L.ui_stack(direction='row', align='center', spacing=2) %}
+        {{ C.ui_draft_swatch_img(hook='row-source-swatch') }}
+        {{ C.ui_text(text='', variant='small', tone='subtle', u_props='data-hook="cc-row-rgb"',
+        hook_class='tabular-nums')
+        }}
+        {% endcall %}
+        <input type="hidden" name="cc_r"><input type="hidden" name="cc_g"><input type="hidden" name="cc_b">
+
+        {# Center: Target Summary #}
+        <div data-hook="cc-collapsed-view">
+            {{ C.ui_text(text=t('sample.color_corrections.mode.lab') ~ ': -', variant='small', tone='neutral',
+            hook_class='font-medium', u_props='data-hook="cc-summary-val"') }}
+        </div>
+
+        {# Right: Actions #}
+        {% call L.ui_stack(direction='row', spacing=1) %}
+        {{ F.ui_icon_button(icon='pencil', variant='ghost', title=t('common.edit'),
+        u_props='data-action="cc-toggle-detail"') }}
+        {{ F.ui_icon_button(icon='trash', variant='ghost', hook_class='text-rose-500 hover:bg-rose-50
+        hover:text-rose-700',
+        title=t('common.delete'),
+        u_props='data-action="cc-remove-row"') }}
+        {% endcall %}
+        {% endcall %}
+
+        {# Expanded Editor View #}
+        {% call L.ui_box(hook_class='mt-2 border-t border-slate-100 pt-2', u_props='data-hook="cc-expanded-view"
+        hidden') %}
+        {% call L.ui_stack(spacing=2) %}
+        {% call L.ui_stack(direction='row', spacing=4) %}
+        {{ F.ui_radio(name="temp_mode", value="lab",
+        label=t('sample.color_corrections.mode.lab'), checked=True,
+        u_props='data-action="cc-mode"') }}
+        {{ F.ui_radio(name="temp_mode", value="note",
+        label=t('sample.color_corrections.mode.note'),
+        u_props='data-action="cc-mode"') }}
+        <input type="hidden" name="cc_mode" value="lab">
+        {% endcall %}
+        {% call L.ui_stack(u_props='data-hook="cc-lab-block"') %}
+        {% call L.ui_grid(cols=3, gap=2) %}
+        {{ F.ui_input(name="cc_l", placeholder='L*', size='xs') }}
+        {{ F.ui_input(name="cc_a", placeholder='a*', size='xs') }}
+        {{ F.ui_input(name="cc_b2", placeholder='b*', size='xs') }}
+        {% endcall %}{% endcall %}
+        {% call L.ui_stack(u_props='data-hook="cc-note-block" hidden') %}
+        {{ F.ui_input(name="cc_note", placeholder=t('sample.color_corrections.fields.note')) }}
+        {% endcall %}
+        {% endcall %}
+        {% endcall %}
+        {% endcall %}
+    </template>
+
+    {% endcall %}{# /ui_container #}
+
+    {# Color Picker Modal #}
+    {{ C.ui_sample_picker_modal() }}
+
+    {% endblock %}

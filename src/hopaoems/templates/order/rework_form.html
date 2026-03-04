@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+
+{% block content %}
+{% set header_actions %}
+{{ F.ui_button(label=t('common.back'), variant='secondary', href=url_for('ui_order.order_view', id=order.id), icon='arrow-left') }}
+{% endset %}
+
+{{ L.ui_page_header(
+title=t('order.rework.title') ~ ' - ' ~ (order.order_no if order else ''),
+actions=header_actions
+) }}
+
+{% call L.ui_container() %}
+{% call C.ui_card() %}
+{% call F.ui_form(action=url_for('ui_order.order_new_rework', id=order.id), spacing=6) %}
+
+{{ F.ui_select(
+name='sample_id',
+label=t('order.rework.fields.sample'),
+options=sample_options,
+value=order.order_items[0].sample_id if order.order_items else None,
+required=True
+) }}
+
+{{ F.ui_select(
+name='fabric_no',
+label=t('order.rework.fields.fabric'),
+options=fabric_options,
+value=order.order_items[0].fabric_no if order.order_items else None,
+required=True
+) }}
+
+{{ F.ui_input(
+name='target_qty',
+label=t('order.rework.fields.target_qty'),
+type='number',
+u_props='step="0.1"',
+required=True
+) }}
+
+{{ F.ui_textarea(
+name='note',
+label=t('common.note'),
+placeholder=t('order.rework.fields.note_placeholder')
+) }}
+
+{% call L.ui_form_footer() %}
+{{ F.ui_button(label=t('common.cancel'), variant='secondary', href=url_for('ui_order.order_view', id=order.id), icon='arrow-left') }}
+{{ F.ui_button(label=t('common.submit'), type='submit', variant='primary', icon='check-lg') }}
+{% endcall %}
+
+{% endcall %}
+{% endcall %}
+{% endcall %}
+
+{% endblock %}

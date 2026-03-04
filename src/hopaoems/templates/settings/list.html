@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{{ L.ui_page_header(title=t('settings.title')) }}
+
+{% call L.ui_container() %}
+{% call C.ui_card(title=t('common.info')) %}
+{% call L.ui_grid(cols=2) %}
+{{ C.ui_stat_card(label=t('common.version'), value="v2.0.0 (One-pass Rebuild)") }}
+{{ C.ui_stat_card(label=t('common.status'), value="Production (SQLite)") }}
+{% endcall %}
+{% endcall %}
+
+{% if is_operator() %}
+{% call C.ui_card(title=t('settings.translations.title')) %}
+{% call L.ui_stack(direction='col', spacing=4) %}
+{{ C.ui_text(text=t('settings.user_management_info'), variant='subtle') }}
+{{ A.ui_action_link(label=t('settings.activity.title'), href=url_for('ui_settings.activity_log'), icon='clock-history',
+tone='primary') }}
+{% endcall %}
+{% endcall %}
+{% endif %}
+{% endcall %}
+{% endblock %}

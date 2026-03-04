@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+
+{% block content %}
+{% set header_actions %}
+{{ F.ui_button(label=t('common.back'), variant='secondary', href=url_for('ui_fabric.fabric_explorer',
+fabric_id=roll.fabric_id), icon='arrow-left') }}
+{% endset %}
+
+{{ L.ui_page_header(
+title=t('fabric.roll.adjust_stock.title'),
+actions=header_actions
+) }}
+
+{% call L.ui_container() %}
+{% call F.ui_form(method='POST') %}
+{% call L.ui_grid(cols=1) %}
+{% call C.ui_card(title=t('fabric.roll.info')) %}
+{% call L.ui_grid(cols=3) %}
+{{ C.ui_stat_card(label=t('fabric.fields.roll_no'), value=roll.roll_no) }}
+{{ C.ui_stat_card(label=t('fabric.fields.code'), value=roll.fabric_code) }}
+{{ C.ui_stat_card(label=t('fabric.fields.current_length'), value=roll.length_m ~ ' m') }}
+{% endcall %}
+{% endcall %}
+
+{% call C.ui_card() %}
+{% call L.ui_grid(cols=1) %}
+{{ F.ui_input(name='new_length_m', label=t('fabric.roll.fields.new_length_m'), type='number', u_props='step="0.01"',
+required=True) }}
+{{ F.ui_textarea(name='note', label=t('common.note'), required=True) }}
+{% endcall %}
+{% endcall %}
+
+{% call L.ui_form_footer() %}
+{{ F.ui_button(label=t('common.cancel'), variant='secondary', href=url_for('ui_fabric.fabric_explorer',
+fabric_id=roll.fabric_id), icon='arrow-left') }}
+{{ F.ui_button(label=t('common.submit'), variant='primary', type='submit', icon='check-lg') }}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endblock %}

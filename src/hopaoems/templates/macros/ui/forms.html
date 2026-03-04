@@ -1,0 +1,210 @@
+{# Forms Macros #}
+
+{% macro ui_button(label, type='button', variant='primary', size='md', icon=None, disabled=False, href=None,
+form=None, width=None, hook_class='', u_props='') -%}
+{% set variants = {
+'primary': 'bg-slate-900 border border-transparent text-white hover:bg-slate-700 focus:outline-none focus:ring-2
+focus:ring-offset-2 focus:ring-slate-500',
+'secondary': 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2
+focus:ring-offset-2 focus:ring-slate-500',
+'danger': 'bg-rose-600 border border-transparent text-white hover:bg-rose-700 focus:outline-none focus:ring-2
+focus:ring-offset-2 focus:ring-rose-500',
+'ghost': 'bg-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2
+focus:ring-offset-2 focus:ring-slate-500',
+'neutral': 'bg-slate-100 border border-slate-300 text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-2
+focus:ring-offset-2 focus:ring-slate-500'
+} %}
+{% set sizes = {
+'xs': 'px-2.5 py-1.5 text-xs',
+'sm': 'px-3 py-2 text-sm leading-4',
+'md': 'px-4 py-2 text-sm',
+'lg': 'px-4 py-2 text-base'
+} %}
+{% set disabled_classes = 'opacity-50 cursor-not-allowed' if disabled else '' %}
+{% set w_class = 'w-full' if width == 'full' else '' %}
+{% set base_classes = 'inline-flex items-center justify-center font-medium rounded-md shadow-sm ' ~ variants[variant] ~
+' ' ~ sizes[size] ~ ' ' ~ w_class ~ ' ' ~ disabled_classes ~ ' ' ~ hook_class %}
+
+{% if href and not disabled %}
+<a href="{{ href }}" class="{{ base_classes }}" {{ u_props|safe }}>
+    {% if icon %}
+    <i class="bi bi-{{ icon }} {{ 'mr-2 -ml-1' if label and label|string != 'None' else '' }}"></i>
+    {% endif %}
+    {% if label and label|string != 'None' %}{{ label }}{% endif %}
+</a>
+{% else %}
+<button type="{{ type }}" class="{{ base_classes }}" {{ 'form="' ~ form ~ '"' if form else '' }} {{ 'disabled' if
+    disabled else '' }} {{ u_props|safe }}>
+    {% if icon %}
+    <i class="bi bi-{{ icon }} {{ 'mr-2 -ml-1' if label and label|string != 'None' else '' }}"></i>
+    {% endif %}
+    {% if label and label|string != 'None' %}{{ label }}{% endif %}
+</button>
+{% endif %}
+{%- endmacro %}
+
+{% macro ui_input(name, label=None, type='text', value='', placeholder='', required=False, readonly=False,
+disabled=False, id=None, autofocus=False, size='md', help_text=None, hook_class='', u_props='') -%}
+{% set sizes = {
+'xs': 'p-1 text-xs',
+'sm': 'px-3 py-2 sm:text-sm',
+'md': 'px-3 py-2 sm:text-sm'
+} %}
+<div class="{{ hook_class }}">
+    {% if label %}
+    <label for="{{ name }}" class="block text-sm font-medium text-slate-700">{{ label }}</label>
+    {% endif %}
+    <div class="mt-1">
+        <input type="{{ type }}" name="{{ name }}" id="{{ id or name }}"
+            value="{{ value if value is not none else '' }}" placeholder="{{ placeholder }}"
+            class="shadow-sm focus:ring-slate-500 focus:border-slate-500 block w-full border-slate-300 rounded-md disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed {{ sizes[size] }}"
+            {{ 'required' if required else '' }} {{ 'readonly' if readonly else '' }} {{ 'disabled' if disabled else ''
+            }} {{ 'autofocus' if autofocus else '' }} {{ u_props|safe }}>
+    </div>
+    {% if help_text %}
+    <p class="mt-1 text-xs text-slate-500">{{ help_text }}</p>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro ui_select(name, options, label=None, value=None, required=False, disabled=False, id=None, help_text=None,
+hook_class='',
+u_props='')
+-%}
+<div class="{{ hook_class }}">
+    {% if label %}
+    <label for="{{ name }}" class="block text-sm font-medium text-slate-700">{{ label }}</label>
+    {% endif %}
+    <div class="mt-1">
+        <select id="{{ id or name }}" name="{{ name }}" title="{{ label or name }}"
+            class="mt-1 block w-full pl-3 pr-10 py-2.5 text-base border-slate-300 focus:outline-none focus:ring-slate-500 focus:border-slate-500 sm:text-sm rounded-md disabled:bg-slate-50 disabled:text-slate-500"
+            {{ 'required' if required else '' }} {{ 'disabled' if disabled else '' }} {{ u_props|safe }}>
+            {% for opt_val, opt_label in options %}
+            {% if opt_label is sequence and opt_label is not string %}
+            <optgroup label="{{ opt_val }}">
+                {% for sub_val, sub_label in opt_label %}
+                <option value="{{ sub_val }}" {{ 'selected' if (value|string)==(sub_val|string) else '' }}>{{ sub_label
+                    }}
+                </option>
+                {% endfor %}
+            </optgroup>
+            {% else %}
+            <option value="{{ opt_val }}" {{ 'selected' if (value|string)==(opt_val|string) else '' }}>{{ opt_label }}
+            </option>
+            {% endif %}
+            {% endfor %}
+        </select>
+    </div>
+    {% if help_text %}
+    <p class="mt-1 text-xs text-slate-500">{{ help_text }}</p>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro ui_textarea(name, label=None, value='', rows=3, placeholder='', required=False, disabled=False, id=None,
+hook_class='',
+u_props='') -%}
+<div class="{{ hook_class }}">
+    {% if label %}
+    <label for="{{ name }}" class="block text-sm font-medium text-slate-700">{{ label }}</label>
+    {% endif %}
+    <div class="mt-1">
+        <textarea id="{{ id or name }}" name="{{ name }}" rows="{{ rows }}" placeholder="{{ placeholder }}"
+            class="shadow-sm focus:ring-slate-500 focus:border-slate-500 block w-full sm:text-sm border-slate-300 rounded-md disabled:bg-slate-50 disabled:text-slate-500"
+            {{ 'required' if required else '' }} {{ 'disabled' if disabled else '' }} {{ u_props|safe
+            }}>{{ value if value is not none else '' }}</textarea>
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro ui_form(method='POST', action='', enctype='', spacing=0, id=None, hook_class='', u_props='') -%}
+<form method="{{ method }}" action="{{ action }}" {{ 'id="' ~ id ~ '"' if id else '' }} {{
+    ('enctype="' ~ enctype ~ '"')|safe if enctype else '' }} class="{{ ' space-y-' ~ spacing if spacing> 0 else '' }} {{
+    hook_class }}" {{ u_props|safe }}>
+    {{ caller() }}
+</form>
+{%- endmacro %}
+
+{% macro ui_checkbox(name, label=None, value=' 1', checked=False, disabled=False, id=None, hook_class='' , u_props='' )
+-%}
+<div class="flex items-start {{ hook_class }}">
+    <div class="flex items-center h-5">
+        <input id="{{ id or name }}" name="{{ name }}" type="checkbox" value="{{ value }}" title="{{ label or name }}"
+            class="focus:ring-slate-500 h-4 w-4 text-slate-900 border-slate-300 rounded disabled:bg-slate-50 disabled:cursor-not-allowed"
+            {{ 'checked' if checked else '' }} {{ 'disabled' if disabled else '' }} {{ u_props|safe }}>
+    </div>
+    {% if label %}
+    <div class="ml-3 text-sm">
+        <label for="{{ name }}" class="font-medium text-slate-700 {{ 'opacity-50' if disabled else '' }}">{{ label
+            }}</label>
+    </div>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro ui_radio(name, label, value, checked=False, disabled=False, id=None, hook_class='', u_props='') -%}
+<label class="inline-flex items-center text-sm font-medium text-slate-700 {{ hook_class }}">
+    <input type="radio" name="{{ name }}" value="{{ value }}" id="{{ id or name ~ '_' ~ value }}"
+        class="h-4 w-4 text-slate-900 border-slate-300 focus:ring-slate-500 disabled:opacity-50" {{ 'checked' if checked
+        else '' }} {{ 'disabled' if disabled else '' }} {{ u_props|safe }}>
+    <span class="ml-2 text-xs font-medium">{{ label }}</span>
+</label>
+{%- endmacro %}
+
+{% macro ui_icon_button(icon, type='button', variant='primary', form=None, disabled=False, hook_class='', u_props='',
+title=None) -%}
+{% set variants = {
+'primary': 'text-slate-600 hover:text-slate-900',
+'danger': 'text-rose-600 hover:text-rose-900',
+'success': 'text-emerald-600 hover:text-emerald-900'
+} %}
+<button type="{{ type }}"
+    class="{{ variants[variant] }} {{ hook_class }} p-2 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors hover:bg-slate-100 rounded-md"
+    {{ 'form="' ~ form ~ '"' if form else '' }} {{ 'disabled' if disabled else '' }} aria-label="{{ title or icon }}"
+    title="{{ title or icon }}" {{ u_props|safe }}>
+    <i class="bi bi-{{ icon }}"></i>
+</button>
+{%- endmacro %}
+
+{% macro ui_action_post_icon(action, icon, tone='primary', title=None, hook_class='', u_props='') -%}
+{% set tones = {
+'primary': 'text-slate-600 hover:text-slate-900',
+'danger': 'text-rose-600 hover:text-rose-900',
+'neutral': 'text-slate-400 hover:text-slate-500',
+'warning': 'text-amber-600 hover:text-amber-900'
+} %}
+<form method="POST" action="{{ action }}" class="contents">
+    <button type="submit"
+        class="inline-flex items-center justify-center font-medium text-sm {{ tones[tone] }} {{ hook_class }} p-2 min-w-[36px] min-h-[36px] transition-colors hover:bg-slate-100 rounded-md"
+        aria-label="{{ title or icon }}" title="{{ title or icon }}" {{ u_props|safe }}>
+        <i class="bi bi-{{ icon }}"></i>
+    </button>
+</form>
+{%- endmacro %}
+
+{% macro ui_file_input(name, label=None, help_text=None, required=False, disabled=False, id=None, hook_class='',
+u_props='') -%}
+<div class="{{ hook_class }}">
+    {% if label %}
+    <label for="{{ id or name }}" class="block text-sm font-medium text-slate-700">{{ label }}</label>
+    {% endif %}
+    <div
+        class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-300 border-dashed rounded-md hover:border-slate-400 transition-colors bg-white">
+        <div class="space-y-1 text-center">
+            <i class="bi bi-cloud-arrow-up text-3xl text-slate-400"></i>
+            <div class="flex text-sm text-slate-600 justify-center mt-2">
+                <label for="{{ id or name }}"
+                    class="relative cursor-pointer bg-white rounded-md font-medium text-slate-600 hover:text-slate-900 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-slate-500">
+                    <span>{{ t('common.upload_file') }}</span>
+                    <input id="{{ id or name }}" name="{{ name }}" type="file" class="sr-only" {{ 'required' if required
+                        else '' }} {{ 'disabled' if disabled else '' }} {{ u_props|safe }}>
+                </label>
+            </div>
+            {% if help_text %}
+            <p class="text-xs text-slate-500 mt-2">{{ help_text }}</p>
+            {% endif %}
+            <p data-hook="{{ id or name }}-filename" class="text-sm font-medium text-slate-900 mt-2" hidden></p>
+        </div>
+    </div>
+</div>
+{%- endmacro %}

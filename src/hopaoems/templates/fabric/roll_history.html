@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/base.html' as A %}
+
+{% set header_actions %}
+{{ A.ui_action_link(label=t('common.back'), href=url_for('ui_fabric.fabric_explorer', fabric_id=roll.fabric_id,
+cylinder_id=roll.cylinder_id),
+icon='arrow-left', tone='neutral', size='sm') }}
+{% endset %}
+
+{% block content %}
+{{ L.ui_page_header(
+title=t('fabric.roll.history') ~ ': ' ~ roll.roll_no,
+actions=header_actions
+) }}
+
+{% call L.ui_container() %}
+{# Roll Info Card #}
+{% call C.ui_card(title=t('fabric.roll.info'), hook_class='') %}
+{% call L.ui_grid(cols=3, gap=4) %}
+{{ C.ui_stat_card(label=t('fabric.fields.roll_no'), value=roll.roll_no) }}
+{{ C.ui_stat_card(label=t('fabric.fields.length_m'), value=roll.length_m ~ ' ' ~ t('common.unit.m')) }}
+{{ C.ui_stat_card(label=t('common.status'), value=t('roll.status.' ~ roll.status), tone='success' if roll.status ==
+'in_stock' else 'neutral') }}
+{% endcall %}
+{% endcall %}
+
+{# History Table #}
+{% call C.ui_card(title=t('common.records')) %}
+{% if history %}
+{% call C.ui_table(headers=[
+t('common.time'),
+t('common.action'),
+t('common.delta'),
+t('common.note'),
+t('common.operator')
+], density='compact') %}
+{% for h in history %}
+{% call C.ui_tr() %}
+{{ C.ui_td(text=h.created_at) }}
+{{ C.ui_td(text=t('fabric.history.action.' ~ h.action)) }}
+{% call C.ui_td() %}
+{{ C.ui_badge(label=(h.delta|round(1)|string) ~ ' ' ~ t('common.unit.m'), tone='success' if h.delta > 0 else ('danger'
+if h.delta < 0 else 'neutral' )) }} {% endcall %} {{ C.ui_td(text=h.note or t('common.none')) }} {{
+    C.ui_td(text=h.created_by or t('common.unknown')) }} {% endcall %} {% endfor %} {% endcall %} {% else %} {{
+    C.ui_empty_state(title=t('common.no_data'), icon='clock-history' ) }} {% endif %} {% endcall %} {% endcall %} {%
+    endblock %}

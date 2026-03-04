@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+
+{% block content %}
+{% set header_actions %}
+{% call L.ui_stack(direction='row', spacing=3, align='center') %}
+{{ F.ui_button(label=t('common.back'), variant='secondary', href=url_for('ui_production.production_task_view',
+id=log.task_id), icon='arrow-left') }}
+{% if log.washed_at or log.wash_session_id %}
+{{ F.ui_button(label=t('production.log.action.undo_wash'), variant='warning', icon='arrow-counterclockwise',
+href=url_for('ui_production.production_log_undo_wash', id=log.id)) }}
+{% endif %}
+{% endcall %}
+{% endset %}
+
+{{ L.ui_page_header(
+title=t('production.log.edit.title'),
+actions=header_actions
+) }}
+
+{% call L.ui_container() %}
+{% call C.ui_card() %}
+{% call F.ui_form(action=url_for('ui_production.production_log_edit', id=log.id), method='POST') %}
+{% call L.ui_stack(direction='col', spacing=6) %}
+{% if log.washed_at or log.wash_session_id %}
+{% call L.ui_stack(direction='col', spacing=2) %}
+{% call C.ui_alert(tone='warning') %}{{ t('production.log.edit.hint_length_triggers_undo') }}{% endcall %}
+{% call C.ui_alert(tone='info') %}{{ t('production.log.edit.hint_note_safe') }}{% endcall %}
+{% endcall %}
+{% endif %}
+
+{% call L.ui_grid(cols=3) %}
+{{ C.ui_stat_card(label=t('fabric.fields.roll_no'), value=log.roll_no) }}
+{{ C.ui_stat_card(label=t('production.log.vat_code'), value=log.vat_code) }}
+{% call C.ui_stat_card(label=t('common.status')) %}
+{% if log.washed_at %}
+{{ C.ui_badge(label=t('production.log.status.washed'), tone='success') }}
+{% else %}
+{{ C.ui_badge(label=t('production.log.status.unwashed'), tone='warning') }}
+{% endif %}
+{% endcall %}
+{% endcall %}
+
+{{ F.ui_input(name='length', label=t('production.logs.length'), type='number', value=log.length, required=True,
+u_props='step="0.01"') }}
+
+{% if log.washed_at or log.wash_session_id %}
+{{ F.ui_checkbox(name='force_undo', label=t('production.log.edit.force_undo_checkbox'), value='1') }}
+{% endif %}
+
+{{ F.ui_textarea(label=t('common.note'), name='note', value=log.note or '', rows=3) }}
+
+{% call L.ui_form_footer() %}
+{{ F.ui_button(label=t('common.cancel'), variant='secondary', href=url_for('ui_production.production_task_view', id=log.task_id), icon='arrow-left') }}
+{{ F.ui_button(label=t('common.save'), type='submit', variant='primary', icon='check-lg') }}
+{% endcall %}
+
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endblock %}

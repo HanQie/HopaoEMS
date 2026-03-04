@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+
+{% block content %}
+{% set header_actions %}
+{% call L.ui_stack(direction='row', spacing=2) %}
+{{ F.ui_button(label=t('common.back'), variant='secondary', href=url_for('ui.index'), icon='arrow-left') }}
+{% if is_operator() %}
+{{ F.ui_button(label=t('nav.history'), href=url_for('ui_wash.wash_history'), icon='clock-history', variant='primary') }}
+{% endif %}
+{% endcall %}
+{% endset %}
+
+{{ L.ui_page_header(
+title=t('wash.list.title'),
+description=t('wash.list.desc'),
+actions=header_actions
+) }}
+
+{% call L.ui_container(u_props='data-hook="wash-list-root"') %}
+
+{% call L.ui_stack(direction='col', spacing=8, align='stretch') %}
+
+{# ── 1. Top Summary (Thin) ── #}
+{% call L.ui_box() %}
+{{ C.ui_stat_grid(items=[
+{'label': t('wash.stats.vats'), 'value': stats.vat_count, 'tone': 'info'},
+{'label': t('wash.stats.unique_rolls'), 'value': stats.unique_roll_count, 'tone': 'info'},
+{'label': t('wash.stats.total_length'), 'value': C.ui_fmt_length_m(stats.total_length), 'tone':
+'info'}
+], cols=3) }}
+{% endcall %}
+
+{# ── 2. Pending Vats Table ── #}
+{% call C.ui_card(title=t('wash.pending.title')) %}
+{% if groups %}
+{% call C.ui_table(headers=[
+{'label': t('wash.group.vat'), 'width': '20%'},
+{'label': t('wash.group.rolls_count'), 'type': 'number', 'width': '15%'},
+{'label': t('wash.group.total_length'), 'type': 'number', 'width': '20%'},
+{'label': t('wash.summary.logs'), 'type': 'number', 'width': '15%'},
+{'label': t('common.actions'), 'type': 'action', 'width': '30%'}
+]) %}
+{% for group in groups %}
+{% call C.ui_tr(u_props='data-hook="wash-vat-row"') %}
+{# Vat Code #}
+{% call C.ui_td(bold=True) %}
+{% if group.is_missing_vat %}
+{{ C.ui_text(text=t('wash.warning.missing_vat_code'), tone='danger', variant='small') }}
+{% else %}
+{% set tone_idx = (group.vat_code|length + group.vat_code|first|int(default=0)) %}
+{{ C.ui_vat_group_header(vat_code=group.vat_code, tone_idx=tone_idx, variant='minimal', hook_class='') }}
+{% endif %}
+{% endcall %}
+
+{# Rolls #}
+{{ C.ui_td(text=group.roll_count, type='number', hook_class='') }}
+
+{# Length #}
+{% call C.ui_td(type='number', hook_class='') %}{{ C.ui_fmt_length_m(group.total_length) }}{% endcall %}
+
+{# Logs Count #}
+{{ C.ui_td(text=group.logs|length, type='number', hook_class='') }}
+
+{# Actions #}
+{% call C.ui_td(type='action') %}
+{% if not group.is_missing_vat and is_operator() %}
+{{ F.ui_button(label=t('wash.action.confirm_wash'),
+href=url_for('ui_wash.wash_register', vat_code=group.vat_code),
+variant='primary', size='sm', icon='check-lg') }}
+{% else %}
+{{ C.ui_text(text=t('common.dash'), tone='subtle') }}
+{% endif %}
+{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% else %}
+{{ C.ui_empty_state(title=t('wash.empty.no_sessions')) }}
+{% endif %}
+{% endcall %}
+{% endcall %} {# End Stack #}
+
+{% endcall %} {# End Container #}
+{% endblock %}

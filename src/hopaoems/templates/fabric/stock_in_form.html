@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+{% block content %}
+{{ L.ui_page_header(
+title=t('fabric.stock_in.title'),
+actions=F.ui_button(label=t('common.back'), href=url_for('ui_fabric.fabric_explorer', fabric_id=fabric_id,
+cylinder_id=cylinder_id, tab=tab), variant='secondary', icon='arrow-left')
+) }}
+
+{% call L.ui_container() %}
+{% call L.ui_box(w='full') %}
+{% call F.ui_form(method="POST", action=url_for('ui_fabric.stock_in_commit'), spacing=6, id='stockin-form',
+u_props='data-hook="fabric-stockin-form" data-gram-per-yard="' ~ (pre_selected_fabric.yard_weight_gyd if
+pre_selected_fabric else 0) ~ '"') %}
+{% call C.ui_card() %}
+
+{# Fabric & Cylinder #}
+{% if pre_selected_fabric and cylinder_id %}
+{# Locked Context - Read Only #}
+{% call L.ui_stack(direction='row', spacing=3, align='center', hook_class='mb-2') %}
+{{ C.ui_stat_inline(label=t('fabric.fields.fabric_code'), value=pre_selected_fabric.fabric_code, tone='neutral') }}
+{{ C.ui_stat_inline(label=t('fabric.cylinder_no'), value=cylinder_no, tone='neutral') }}
+{% endcall %}
+<input type="hidden" name="fabric_id" value="{{ fabric_id }}">
+<input type="hidden" name="cylinder_id" value="{{ cylinder_id }}">
+<input type="hidden" name="cylinder_no" value="{{ cylinder_no }}">
+<input type="hidden" name="cylinder_mode" value="existing">
+{% else %}
+{# Unlocked Mode (Global) #}
+{% call L.ui_grid(cols=2, gap=4) %}
+{% set fabric_opts = [('', t('common.select_placeholder'))] %}
+{% for f in fabrics %}
+{% set _ = fabric_opts.append((f.id, f.fabric_code)) %}
+{% endfor %}
+
+{# Reload page on fabric change to update GYD context #}
+{{ F.ui_select(name='fabric_id', label=t('fabric.fields.fabric_code'), options=fabric_opts, value=fabric_id,
+u_props='data-hook="fabric-select"') }}
+
+{% call L.ui_stack(direction='col', spacing=2) %}
+{{ C.ui_text(text=t('fabric.cylinder_no'), variant='small', bold=True) }}
+
+{% call L.ui_stack(direction='row', spacing=4, hook_class='mb-1') %}
+{{ F.ui_radio(name='cylinder_mode', label=t('fabric.cylinder.existing'), value='existing',
+checked=(fabric_cylinders and cylinder_id) or (fabric_cylinders and not cylinder_no),
+u_props='data-hook="stockin-cyl-mode-existing"') }}
+{{ F.ui_radio(name='cylinder_mode', label=t('fabric.cylinder.new'), value='new',
+checked=(not fabric_cylinders or (cylinder_no and not cylinder_id)),
+u_props='data-hook="stockin-cyl-mode-new"') }}
+{% endcall %}
+
+<div data-hook="stockin-cyl-existing-wrap" {% if not fabric_cylinders or (cylinder_no and not cylinder_id) %}hidden{%
+    endif %}>
+    {% set existing_opts = [('', t('common.select_placeholder'))] %}
+    {% for cyl in fabric_cylinders %}
+    {% set _ = existing_opts.append((cyl.id, cyl.cylinder_no)) %}
+    {% endfor %}
+    {{ F.ui_select(name='existing_cylinder_id', options=existing_opts, value=cylinder_id,
+    u_props='data-hook="stockin-existing-select" title="' ~ t('fabric.cylinder.existing') ~ '"') }}
+</div>
+
+<div data-hook="stockin-cyl-new-wrap" {% if fabric_cylinders and (not cylinder_no or cylinder_id) %}hidden{% endif %}>
+    {{ F.ui_input(name='cylinder_no', value=cylinder_no, placeholder=t('fabric.cylinder.new_placeholder')) }}
+</div>
+{% endcall %}
+<input type="hidden" name="cylinder_id" value="{{ cylinder_id or '' }}">
+{% endcall %}
+{% endif %}
+<input type="hidden" name="tab" value="{{ tab or 'in_stock' }}">
+
+<script>
+    // Simple listener for toggle
+    document.addEventListener('DOMContentLoaded', () => {
+        const radios = document.querySelectorAll('input[name="cylinder_mode"]');
+        const wrapExist = document.querySelector('[data-hook="stockin-cyl-existing-wrap"]');
+        const wrapNew = document.querySelector('[data-hook="stockin-cyl-new-wrap"]');
+
+        radios.forEach(r => r.addEventListener('change', (e) => {
+            if (e.target.value === 'existing') {
+                if (wrapExist) { wrapExist.classList.remove('hidden'); wrapExist.hidden = false; }
+                if (wrapNew) { wrapNew.classList.add('hidden'); wrapNew.hidden = true; }
+            } else {
+                if (wrapExist) { wrapExist.classList.add('hidden'); wrapExist.hidden = true; }
+                if (wrapNew) { wrapNew.classList.remove('hidden'); wrapNew.hidden = false; }
+            }
+        }));
+    });
+</script>
+
+<div id="gyd-data" hidden data-gyd="{{ pre_selected_fabric.yard_weight_gyd if pre_selected_fabric else 0 }}"></div>
+
+{% if not fabric_id %}
+{% call C.ui_alert(tone='info') %}{{ t('fabric.explorer.select_fabric_hint') }}{% endcall %}
+{% elif not pre_selected_fabric.yard_weight_gyd %}
+{% call C.ui_alert(tone='danger') %}{{ t('fabric.stock_in.error.missing_gyd') }}{% endcall %}
+{% endif %}
+
+{% if pre_selected_fabric and pre_selected_fabric.yard_weight_gyd %}
+{% call C.ui_text(variant='small', tone='subtle') %}
+{{ A.ui_icon('info-circle') }} {{ t('fabric.stock_in.warning.length_only') }}
+{% endcall %}
+
+{# Row Action Buttons Row #}
+{% call L.ui_stack(direction='row', spacing=2, justify='between', align='center', hook_class='mt-4 mb-1') %}
+{% call L.ui_stack(direction='row', spacing=2) %}
+{{ F.ui_button(label=t('fabric.intake.bulk_import'), type='button', variant='secondary',
+icon='file-earmark-spreadsheet', size='sm',
+u_props='data-action="stockin-bulk-import-open"') }}
+{{ A.ui_action_link(label=t('fabric.intake.download_template'),
+href=url_for('ui_fabric.stock_in_template_xlsx'), icon='download', tone='primary') }}
+{% endcall %}
+{% call L.ui_stack(direction='row', spacing=2) %}
+{{ F.ui_button(label=t('fabric.stock_in.actions.add_1_row'), type='button', variant='secondary', size='sm',
+u_props='data-action="stockin-add-1"') }}
+{{ F.ui_button(label=t('fabric.stock_in.actions.add_10_rows'), type='button', variant='secondary', size='sm',
+u_props='data-action="stockin-add-10"') }}
+{% endcall %}
+{% endcall %}
+
+{# Bulk Import Panel (hidden by default) #}
+<div hidden data-hook="stockin-bulk-panel">
+    {% call C.ui_card() %}
+    {% call L.ui_stack(direction='col', spacing=3) %}
+    {{ C.ui_text(text=t('fabric.intake.bulk_import'), variant='h3', bold=True) }}
+
+    {% call L.ui_stack(direction='col', spacing=4, u_props='id="bulk-import-form" data-hook="stockin-bulk-form"') %}
+    {{ F.ui_file_input(name='xlsx_file', u_props='accept=".xlsx" data-hook="stockin-bulk-file"') }}
+
+    {# Apply Mode #}
+    {% call L.ui_stack(direction='row', spacing=4) %}
+    {{ F.ui_radio(name='apply_mode', label=t('fabric.intake.import.apply_replace'), value='replace', checked=True,
+    u_props='data-hook="stockin-apply-mode"') }}
+    {{ F.ui_radio(name='apply_mode', label=t('fabric.intake.import.apply_append'), value='append',
+    u_props='data-hook="stockin-apply-mode"') }}
+    {% endcall %}
+
+    {% call L.ui_stack(direction='row', spacing=2, justify='end') %}
+    {{ F.ui_button(label=t('fabric.intake.bulk_import'), type='button', variant='primary', icon='cloud-upload',
+    size='sm',
+    u_props='data-action="stockin-bulk-preview"') }}
+    {{ F.ui_button(label=t('common.cancel'), type='button', variant='secondary', size='sm',
+    u_props='data-action="stockin-bulk-import-close"') }}
+    {% endcall %}
+    {% endcall %}
+
+    {# Preview Area (filled by JS) #}
+    <div hidden data-hook="stockin-bulk-preview-area">
+        {% call L.ui_stack(direction='col', spacing=2) %}
+        {% call C.ui_text(variant='small', tone='success') %}
+        {{ A.ui_icon('check-circle', tone='success') }}
+        <span data-hook="stockin-bulk-success-count"></span>
+        {% endcall %}
+        <div hidden data-hook="stockin-bulk-errors">
+            {% call C.ui_text(variant='small', tone='danger') %}
+            {{ A.ui_icon('x-circle', tone='danger') }}
+            <span data-hook="stockin-bulk-fail-count"></span>
+            {% endcall %}
+            <ul data-hook="stockin-bulk-error-list"></ul>
+        </div>
+        {{ F.ui_button(label=t('common.apply'), type='button', variant='primary', size='sm',
+        u_props='data-action="stockin-bulk-apply"') }}
+        {% endcall %}
+    </div>
+
+    {% endcall %}
+    {% endcall %}
+</div>
+{% endif %}
+
+{# 3 Initial Rows #}
+{% call C.ui_table(headers=[t('roll.fields.roll_no'), {'label': t('fabric.stock_in.fields.weight_kg'), 'align':
+'right'}, {'label': t('common.remark'), 'align': 'left'},
+{'label': t('fabric.fields.length'), 'align': 'right'}], body_hook='stockin-tbody') %}
+{% for i in range(1, 4) %}
+<tr data-hook="fabric-stockin-row">
+    {% call C.ui_td() %}
+    {{ F.ui_input(name='roll_no_' ~ i, placeholder=t('fabric.stock_in.roll_placeholder', n=i),
+    u_props='data-hook="fabric-stockin-rollno"') }}
+    {% endcall %}
+    {% call C.ui_td(align='right') %}
+    {{ F.ui_input(name='weight_kg_' ~ i, placeholder=t('fabric.stock_in.unit_kg'),
+    u_props='data-hook="fabric-stockin-kg"') }}
+    {% endcall %}
+    {% call C.ui_td(align='left') %}
+    {{ F.ui_input(name='remark_' ~ i, placeholder='-',
+    u_props='data-hook="fabric-stockin-remark"') }}
+    {% endcall %}
+    {% call C.ui_td(align='right', hook_class='') %}
+    {# Display Only #}
+    {{ C.ui_text(text='-', variant='mono', tone='subtle', u_props='data-hook="fabric-stockin-length"') }}
+    {% endcall %}
+</tr>
+{% endfor %}
+{% endcall %}
+{% endcall %}
+
+{# Footer #}
+{% call L.ui_form_footer() %}
+{{ F.ui_button(label=t('common.back'), href=url_for('ui_fabric.fabric_explorer', fabric_id=fabric_id,
+cylinder_id=cylinder_id, tab=tab), variant='secondary', icon='arrow-left') }}
+{% if pre_selected_fabric and pre_selected_fabric.yard_weight_gyd %}
+{{ F.ui_button(label=t('fabric.stock_in.actions.commit'), type='submit', variant='primary', icon='check-lg',
+form='stockin-form') }}
+{% else %}
+{{ F.ui_button(label=t('fabric.stock_in.actions.commit'), type='button', variant='neutral', disabled=True,
+icon='check-lg', form='stockin-form') }}
+{% endif %}
+{% endcall %}
+
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endblock %}

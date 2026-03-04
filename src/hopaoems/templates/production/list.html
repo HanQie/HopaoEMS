@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% block page_width %}full{% endblock %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+
+{% block content %}
+{% set toolbar %}
+{{ C.ui_list_toolbar(
+search_placeholder=t('production.search.placeholder'),
+secondary_actions=(A.ui_action_link(label=t('production.action.test_consume'),
+href=url_for('ui_production.production_test_consume'), icon='tag', tone='neutral') if is_operator() else None)
+) }}
+{% endset %}
+
+{{ L.ui_page_header(
+title=t('production.dashboard.title'),
+description=t('production.dashboard.desc'),
+actions=toolbar
+) }}
+
+{% call L.ui_container() %}
+
+{# A) KPI Summary #}
+{% set unwashed_tone = 'danger' if stats.unwashed_logs_count > 0 else 'success' %}
+{{ C.ui_stat_grid(items=[
+{'label': t('production.stats.active_tasks'), 'value': stats.active_tasks, 'tone': 'info'},
+{'label': t('production.stats.unwashed_logs'), 'value': stats.unwashed_logs_count, 'tone': unwashed_tone},
+{'label': t('production.stats.open_orders'), 'value': stats.open_orders_count, 'tone': 'neutral'},
+{'label': t('common.inventory'), 'value': C.ui_fmt_length_m(stats.inventory_total_length_m), 'tone': 'neutral'}
+], cols=4) }}
+
+{# B) Active Production Queue #}
+{% call C.ui_card(title=t('production.active_queue'), hook_class='') %}
+{% if tasks %}
+{% call C.ui_table(headers=[
+t('common.preview'),
+t('production.fields.task_info'),
+t('production.progress.title'),
+t('common.status'),
+{'label': t('common.actions'), 'type': 'action'}
+], density='comfortable') %}
+{% for task in tasks %}
+{% call C.ui_tr() %}
+
+{# Preview #}
+{% call C.ui_td() %}
+{{ C.ui_sample_thumb(preview_path=task.preview_path, size='sm') }}
+{% endcall %}
+
+{# Task Info #}
+{% call C.ui_td() %}
+{% call L.ui_stack(direction='col', spacing=1) %}
+{{ A.ui_link(label=task.order_no or t('common.none'),
+href=url_for('ui_order.order_view', id=task.order_id) if task.order_id else '#',
+tone='primary', variant='small') }}
+{{ C.ui_text(text=task.sample_title, variant='body', bold=True) }}
+{{ C.ui_badge(label=task.fabric_no, tone='neutral') }}
+{% endcall %}
+{% endcall %}
+
+{# Progress #}
+{% call C.ui_td(hook_class='') %}
+{{ C.ui_progress_bar(task.progress_pct, aria_label_key=t('production.progress.aria_label'), tone='success' if
+task.progress_pct >= 100
+else 'primary', printed_m=task.printed_length_m, target_m=task.target_length_m) }}
+{% endcall %}
+
+{# Status (Unwashed Count) #}
+{% call C.ui_td() %}
+{% if task.pending_wash_count > 0 %}
+{{ C.ui_badge(label=t('production.status.unwashed', count=task.pending_wash_count), tone='warning') }}
+{% else %}
+{{ C.ui_badge(label=t('production.status.ready'), tone='success') }}
+{% endif %}
+{% endcall %}
+
+{# Actions #}
+{% call C.ui_td(type='action') %}
+{% set action_view %}
+{{ A.ui_action_link(label=None,
+href=url_for('ui_production.production_task_view', id=task.id),
+icon='eye', tone='neutral',
+u_props='title="' ~ t('common.view') ~ '" aria-label="' ~ t('common.view') ~ '"') }}
+{% endset %}
+
+{% set action_produce %}
+{% if is_operator() %}
+{{ A.ui_action_link(label=None,
+href=url_for('ui_production.production_task_produce', id=task.id),
+icon='play-fill', tone='primary',
+u_props='data-hook="produce-button" title="' ~ t('production.action.produce') ~ '" aria-label="' ~
+t('production.action.produce') ~ '"') }}
+{% endif %}
+{% endset %}
+
+{% set action_complete %}
+{% if is_operator() and task.can_complete %}
+{{ F.ui_action_post_icon(
+action=url_for('ui_production.production_task_done', id=task.id),
+icon='check-lg', tone='success', title=t('production.action.complete'), u_props='data-hook="done-button"') }}
+{% endif %}
+{% endset %}
+
+{{ C.ui_row_actions_fixed(slot1=action_view if action_view.strip() else None, slot2=action_produce if
+action_produce.strip() else None, slot3=action_complete if action_complete.strip() else None) }}
+{% endcall %}
+
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% else %}
+{{ C.ui_empty_state(title=t('production.empty.no_active_tasks'), icon='list-check') }}
+{% endif %}
+{% endcall %}
+
+{% endcall %}
+
+{{ C.ui_pagination(pagination, endpoint='ui_production.production_dashboard') }}
+{% endblock %}

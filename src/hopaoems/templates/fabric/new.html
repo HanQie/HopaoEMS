@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+
+{% block content %}
+{% set header_actions %}
+{{ F.ui_button(label=t('common.back'), variant='secondary', href=next_url or url_for('ui_fabric.stock_in_form'),
+icon='arrow-left') }}
+{% endset %}
+
+{{ L.ui_page_header(
+title=t('fabric.roll.edit.title') if fabric else t('fabric.new.title'),
+actions=header_actions
+) }}
+
+{% call L.ui_container() %}
+{% call L.ui_box(w='2/3') %}
+{% call C.ui_card() %}
+{% set form_action = url_for('ui_fabric.fabric_edit', id=fabric.id) if fabric else url_for('ui_fabric.fabric_new',
+next=next_url) %}
+{% call F.ui_form(method='POST', action=form_action, spacing=6, id='fabric-form') %}
+
+{% call L.ui_grid(cols=1, gap=4) %}
+{{ F.ui_input(name='fabric_code', label=t('fabric.fields.fabric_code'), required=True, value=fabric_code or
+(fabric.fabric_code if fabric else '')) }}
+
+{{ F.ui_input(name='width_mm', label=t('fabric.fields.width_cm'), type='text',
+value=(fabric.width_mm / 10)|round(1)|string|replace('.0', '') if fabric and fabric.width_mm else '') }}
+
+{{ F.ui_input(name='gram_per_yard', label=t('fabric.fields.gram_per_yard'), type='number', u_props='step="0.01"',
+required=True, value=fabric.yard_weight_gyd if fabric else '') }}
+
+{% set material_options = [
+('', t('common.select_placeholder')),
+('poly', t('fabric.material.poly')),
+('nylon', t('fabric.material.nylon')),
+('other', t('fabric.material.other'))
+] %}
+{{ F.ui_select(name='material_type', label=t('fabric.fields.material_type'), options=material_options, required=True,
+value=fabric.material if fabric else '') }}
+
+{{ F.ui_textarea(name='remark', label=t('common.remark'), rows=2,
+value=fabric.remark if fabric else '', placeholder='-') }}
+{% endcall %}
+
+{% call L.ui_form_footer() %}
+{{ F.ui_button(label=t('common.cancel'), variant='secondary', href=next_url or url_for('ui_fabric.stock_in_form'),
+icon='arrow-left') }}
+{{ F.ui_button(label=t('common.save') if fabric else t('common.create'), variant='primary', type='submit',
+icon='check-lg', form='fabric-form') }}
+{% endcall %}
+
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endblock %}

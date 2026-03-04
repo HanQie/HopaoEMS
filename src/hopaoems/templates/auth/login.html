@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+
+{% block content %}
+{% call L.ui_center_box(size='md') %}
+{{ L.ui_page_header(title=t('auth.login.title')) }}
+
+{% call C.ui_card() %}
+{% call F.ui_form(method='POST', action=url_for('auth.login', next=request.args.get('next', '')), spacing=6) %}
+{{ F.ui_input(
+label=t('auth.fields.username'),
+name='username',
+id='username',
+required=True,
+autofocus=True
+) }}
+
+{{ F.ui_input(
+label=t('auth.fields.password'),
+name='password',
+id='password',
+type='password',
+required=True
+) }}
+
+{% call L.ui_stack(spacing=2) %}
+{{ F.ui_button(
+label=t('auth.action.login'),
+type='submit',
+variant='primary',
+width='full',
+icon='check-lg'
+) }}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endblock %}

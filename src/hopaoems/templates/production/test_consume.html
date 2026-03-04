@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+
+{% block content %}
+{% set header_actions %}
+{{ F.ui_button(label=t('common.back'), variant='secondary',
+href=url_for('ui_production.production_dashboard'), icon='arrow-left') }}
+{% endset %}
+
+{{ L.ui_page_header(
+title=t('production.test_consume.title'),
+description=t('production.test_consume.desc'),
+actions=header_actions
+) }}
+
+{% call L.ui_container() %}
+
+{% call C.ui_card(title=t('production.test_consume.title')) %}
+
+{# Step 1: Roll Search #}
+{% call F.ui_form(method='GET', action=url_for('ui_production.production_test_consume'), spacing=4, hook_class='')
+%}
+{% call L.ui_stack(direction='row', align='end', spacing=2) %}
+{{ F.ui_input(name='roll_q',
+label=t('production.test_consume.fields.search_roll'),
+value=roll_q,
+placeholder=t('common.search_placeholder'),
+hook_class='') }}
+{{ F.ui_button(label=t('common.search'), type='submit', variant='secondary', icon='search') }}
+{% endcall %}
+{% endcall %}
+
+{# Step 2: Consume Form #}
+{% call F.ui_form(method='POST', action=url_for('ui_production.production_test_consume'), spacing=6) %}
+{{ F.ui_select(name='roll_id',
+label=t('production.test_consume.fields.roll'),
+options=roll_options,
+required=True,
+help_text=t('production.test_consume.fields.roll_help') if roll_options else
+t('production.test_consume.fields.no_rolls_hint')) }}
+
+{{ F.ui_input(name='length',
+label=t('production.test_consume.fields.length'),
+type='number',
+u_props='step="0.01"',
+required=True) }}
+
+{{ F.ui_input(name='note',
+label=t('production.test_consume.fields.note'),
+required=False) }}
+
+{{ F.ui_checkbox(name='mark_empty',
+label=t('production.test_consume.fields.mark_empty'),
+value='1') }}
+
+{% call L.ui_form_footer() %}
+{{ F.ui_button(label=t('common.cancel'), variant='secondary', href=url_for('ui_production.production_dashboard'),
+icon='arrow-left') }}
+{{ F.ui_button(label=t('production.action.test_consume'), type='submit', variant='primary', icon='check-lg') }}
+{% endcall %}
+
+{% endcall %}{# /POST form #}
+
+{% endcall %}{# /card #}
+
+{% endcall %}{# /container #}
+{% endblock %}

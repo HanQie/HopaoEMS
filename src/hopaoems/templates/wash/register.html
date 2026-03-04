@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+
+{% block content %}
+{% set header_actions %}
+{{ F.ui_button(label=t('common.back'), variant='secondary', href=url_for('ui_wash.wash_list'), icon='arrow-left') }}
+{% endset %}
+
+{{ L.ui_page_header(
+title=t('wash.action.create_session'),
+description=t('wash.group.vat') ~ ': ' ~ group.vat_code,
+actions=header_actions
+) }}
+
+{% call L.ui_container() %}
+
+{# 1. Summary Stats #}
+{{ C.ui_stat_grid(items=[
+{'label': t('wash.group.rolls_count'), 'value': group.roll_count, 'tone': 'info'},
+{'label': t('wash.group.total_length'), 'value': C.ui_fmt_length_m(group.total_length), 'tone': 'info'},
+{'label': t('wash.summary.logs'), 'value': group.logs|length, 'tone': 'info'}
+], cols=3) }}
+
+{# 2. Registration Form #}
+{% call C.ui_card(title=t('wash.pending.title')) %}
+{% call F.ui_form(action=url_for('ui_wash.wash_commit'), method='POST', u_props='data-hook="wash-register-form"') %}
+<input type="hidden" name="vat_code" value="{{ group.vat_code }}">
+
+{% set table_headers = [
+None,
+t('production.logs.date'),
+t('fabric.fields.roll_no'),
+t('production.fields.task_id'),
+{'label': t('wash.header.length'), 'align': 'right'},
+t('common.note')
+] %}
+
+{% set checkbox_header %}
+{% call L.ui_stack(direction='row', spacing=2, align='center') %}
+{{ F.ui_checkbox(u_props='data-hook="wash-select-all" aria-label="' ~ t('common.select_all') ~ '"') }}
+{{ C.ui_text(text=t('common.select_all'), tone='subtle', variant='small') }}
+{% endcall %}
+{% endset %}
+{% set table_headers = [checkbox_header] + table_headers[1:] %}
+
+{% call C.ui_table(headers=table_headers, rows=group.logs, density='compact') %}
+{% for log in group.logs %}
+{% call C.ui_tr() %}
+{% call C.ui_td() %}
+{{ F.ui_checkbox(name='log_ids', value=log.id, checked=True, u_props='data-hook="wash-log-checkbox"') }}
+{% endcall %}
+{% call C.ui_td(hook_class='') %}{{ C.ui_fmt_dt_min(log.created_at) }}{% endcall %}
+{% call C.ui_td() %}{{ log.roll_no }}{% endcall %}
+{% call C.ui_td() %}
+{{ A.ui_action_link(label='#' ~ log.task_id, href=url_for('ui_production.production_task_view', id=log.task_id),
+tone='neutral') }}
+{% endcall %}
+{% call C.ui_td(align='right', hook_class='') %}{{ C.ui_fmt_length_m(log.length) }}{% endcall %}
+{% call C.ui_td(hook_class='truncate') %}
+{{ log.note or C.ui_text(text=t('common.none'), tone='subtle', variant='small') }}
+{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+
+{% call L.ui_form_footer() %}
+{{ F.ui_button(label=t('common.cancel'), variant='secondary', href=url_for('ui_wash.wash_list'), icon='arrow-left') }}
+{{ F.ui_button(label=t('wash.action.mark_washed'), type='submit', variant='primary', icon='check-lg') }}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+
+{% endcall %}
+{% endblock %}

@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# NOTE: .venv/ is intentionally tracked in this repo.
+# Do NOT add .venv/ to this ignore file.
+
+# Runtime Databases — never tracked
+src/hopaoems/instance/*.sqlite
+src/hopaoems/instance/*.db
+src/data/*.db
+*.sqlite
+*.db
+
+# Uploads & Generated Assets — never tracked
+src/hopaoems/instance/uploads/**
+!src/hopaoems/instance/uploads/.gitkeep
+src/uploads/**
+!src/uploads/.gitkeep
+src/data/uploads/**
+!src/data/uploads/.gitkeep
+
+# Test / QA Output — never tracked
+*.log
+qa_results_*.json
+gate_output*.txt
+gate_result.txt
+e2e_out.txt
+server_error.log
+qa_e2e_http.log
+
+# Screenshots — never tracked
+qa_screenshots/
+screenshots/
+
+# Temp / Backup Files — never tracked
+*.bak
+*.temp
+*.tmp
+tree_new.txt
+tree.txt
+modal_diff.txt
+
+# IDE
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,12 @@
+{% import 'macros/ui/foundation.html' as U %}
+{% import 'macros/ui/base.html' as A %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/components.html' as C %}
+
+{% set width = self.page_width()|trim if self.page_width else '7xl' %}
+{% call L.ui_app_shell(current_user=g.user, width=width) %}
+{% block content %}{% endblock %}
+{% endcall %}
+
+{% block page_width %}7xl{% endblock %}

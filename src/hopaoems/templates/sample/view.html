@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+
+{% block content %}
+{% set actions %}
+{% call L.ui_stack(direction='row', spacing=2) %}
+{{ F.ui_button(label=t('common.back'), variant='secondary', href=url_for('ui_sample.sample_list'), icon='arrow-left') }}
+{% endcall %}
+{% endset %}
+
+{% set disp_ver = sample.version|string|replace('v', '')|replace('V', '') if sample.version else '1' %}
+
+{{ L.ui_page_header(
+title=t('sample.view.title', id=sample.sample_no) ~ ' · V' ~ disp_ver,
+actions=actions
+) }}
+
+{% call L.ui_container() %}
+
+{# 1. KPI Strip: fabric_no / dates / corrections #}
+{{ C.ui_stat_grid(items=[
+{'label': t('fabric.fields.fabric_no'), 'value': sample.fabric_no or t('common.none'), 'tone': 'neutral'},
+{'label': t('sample.fields.sampled_date'), 'value': sample.sampled_date or t('common.none'), 'tone': 'neutral'},
+{'label': t('sample.fields.date_received'), 'value': sample.date_received or t('common.none'), 'tone': 'neutral'},
+{'label': t('sample.kpi.corrections'), 'value': stats.color_pick_count, 'tone': 'info'}
+], cols=4) }}
+
+{# 2. Two-Column Body #}
+{% call L.ui_grid(cols=2, gap=6, hook_class='items-stretch') %}
+
+{# Left: Preview Panel #}
+{% call L.ui_box(hook_class='min-w-0 h-full') %}
+{% call C.ui_card(title=t('sample.list.columns.preview'), hook_class='h-full flex flex-col') %}
+{% call L.ui_stack(spacing=3, hook_class='flex-1') %}
+
+{# Bounded preview image read-only #}
+{% if sample.preview_path %}
+{% call L.ui_box(hook_class='ui-sample-preview flex-1') %}
+<img src="{{ url_for('ui.sample_image', filename=sample.preview_path) }}" alt="{{ sample.title }}"
+    style="object-fit: contain; width: 100%; height: 100%; max-height: 600px; border-radius: 0.25rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);">
+{% endcall %}
+{% else %}
+{{ C.ui_empty_state(title=t('sample.no_preview'), icon='image', description=None, hook_class='h-full flex flex-col
+items-center justify-center') }}
+{% endif %}
+
+{% endcall %}
+{% endcall %}
+{% endcall %}
+
+{# Right: Info & Corrections Panel #}
+{% call L.ui_box(hook_class='min-w-0 h-full') %}
+
+{# Unified Dossier Card #}
+{% call C.ui_card(title=t('sample.info'), hook_class='h-full flex flex-col') %}
+
+{# Top section: Basic Info #}
+{% call L.ui_grid(cols=2, gap=4) %}
+{{ C.ui_stat_inline(label=t('sample.fields.no'), value=sample.sample_no) }}
+{{ C.ui_stat_inline(label=t('sample.fields.version'), value='V' ~ disp_ver) }}
+{{ C.ui_stat_inline(label=t('fabric.fields.fabric_no'), value=sample.fabric_no or '-') }}
+{{ C.ui_stat_inline(label=t('sample.fields.title'), value=sample.title or '-') }}
+{{ C.ui_stat_inline(label=t('sample.fields.sampled_date'), value=sample.sampled_date or '-') }}
+{{ C.ui_stat_inline(label=t('sample.fields.date_received'), value=sample.date_received or '-') }}
+{{ C.ui_stat_inline(label=t('sample.fields.printing_environment'), value=sample.printing_environment or '-') }}
+{{ C.ui_stat_inline(label=t('sample.fields.printing_file_name'), value=sample.printing_file_name or '-') }}
+{% endcall %}
+
+{% if sample.remark %}
+{% call L.ui_stack(spacing=1, hook_class='mt-4 pt-4 border-t border-slate-100') %}
+{{ C.ui_text(text=t('sample.fields.remark'), variant='small', tone='subtle', bold=True) }}
+{{ C.ui_text(text=sample.remark, variant='preline') }}
+{% endcall %}
+{% endif %}
+
+{# Dossier Divider -> Bottom Section: Corrections Table #}
+{% call L.ui_stack(spacing=4, hook_class='mt-6 pt-6 border-t border-slate-100') %}
+
+{{ C.ui_text(text=t('sample.color_corrections.title'), variant='body', bold=True, tone='neutral') }}
+
+{% if not color_maps %}
+{# Empty State without CTA #}
+{{ C.ui_empty_state(
+title=t('sample.color_corrections.empty.title'),
+description=None,
+icon='palette'
+) }}
+{% else %}
+{# Corrections table without action column #}
+{% call C.ui_table(headers=[
+t('sample.color_corrections.columns.source'),
+t('sample.color_corrections.columns.target')
+], density='compact') %}
+{% for cm in color_maps %}
+{% call C.ui_tr() %}
+{# Source #}
+{% call C.ui_td() %}
+{% call L.ui_stack(direction='row', align='center', spacing=2) %}
+{{ C.ui_swatch(color=cm.hex) }}
+{{ C.ui_text(text='RGB ' ~ cm.rgb_r ~ ', ' ~ cm.rgb_g ~ ', ' ~ cm.rgb_b, variant='small', tone='subtle') }}
+{% endcall %}
+{% endcall %}
+{# Target #}
+{% call C.ui_td() %}
+{% if cm.target_mode == 'lab' %}
+{% call L.ui_stack(direction='row', spacing=2, align='center') %}
+{{ C.ui_badge(label='L ' ~ cm.target_l) }}
+{{ C.ui_badge(label='a ' ~ cm.target_a) }}
+{{ C.ui_badge(label='b ' ~ cm.target_b) }}
+{% endcall %}
+{% else %}
+{{ C.ui_text(text=cm.target_note or '-', variant='small', tone='subtle') }}
+{% endif %}
+{% endcall %}
+
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% endif %}
+
+{% endcall %}
+{% endcall %}
+
+{% endcall %}{# ends Right Box wrapper #}
+
+{% endcall %}{# ends 2-col grid #}
+
+{% endcall %}{# ends container #}
+{% endblock %}

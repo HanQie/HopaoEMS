@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% block page_width %}full{% endblock %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+
+{% block content %}
+{{ L.ui_page_header(title=t('order.list.title'), description=t('order.list.desc')) }}
+
+{% call L.ui_container() %}
+{# Tabs #}
+{% set tab_items = [
+{'label': t('order.tabs.active'), 'href': url_for('ui_order.order_list', status='active'), 'key': 'active'},
+{'label': t('order.tabs.completed'), 'href': url_for('ui_order.order_list', status='completed'), 'key': 'completed'},
+{'label': t('order.tabs.all'), 'href': url_for('ui_order.order_list', status='all'), 'key': 'all'}
+] %}
+{% set tabs_html %}
+{{ C.ui_tabs(items=tab_items, active_key=status) }}
+{% endset %}
+
+{# Toolbar (Strict Phase 6) #}
+{{ C.ui_list_toolbar(
+search_key='order',
+tabs=tabs_html,
+secondary_actions=(F.ui_button(label=t('order.list.create_new'), href=url_for('ui_order.order_new'), icon='plus',
+variant='primary', size='sm', u_props='data-hook="new-order-button"') if is_operator() else None)
+) }}
+
+{# Table #}
+{% call C.ui_card(hook_class='') %}
+{% call C.ui_table(headers=[
+{'label': t('order.fields.order_no'), 'width': '10ch'},
+{'label': t('order.item.fabric_no'), 'width': '10ch'},
+{'label': t('order.fields.items'), 'type': 'number', 'width': '4ch'},
+{'label': t('order.fields.tasks'), 'type': 'number', 'width': '4ch'},
+{'label': t('common.status'), 'type': 'status', 'width': '8ch'},
+{'label': t('order.fields.date'), 'type': 'date', 'width': '10ch'},
+{'label': t('order.fields.due_date'), 'type': 'date', 'width': '10ch'},
+{'label': t('common.remaining'), 'width': '8ch'},
+{'label': t('common.note'), 'type': 'note'},
+{'label': t('common.actions'), 'type': 'action', 'width': '9ch'}
+], rows=orders) %}
+{% for order in orders %}
+{% call C.ui_tr() %}
+{# Order No #}
+{% call C.ui_td(bold=True) %}
+{{ A.ui_action_link(label=order.order_no, href=url_for('ui_order.order_view', id=order.id), tone='primary') }}
+{% endcall %}
+
+{# Fabric #}
+{% call C.ui_td() %}
+{% set fabric_val = (order.fabric_no ~ (' (+)' if order.item_count > 1 else '')) if order.fabric_no else '-' %}
+{{ C.ui_text(text=fabric_val, variant='small') }}
+{% endcall %}
+
+{# Items #}
+{% call C.ui_td(type='number') %}
+{{ C.ui_text(text=order.item_count, variant='small') }}
+{% endcall %}
+
+{# Tasks #}
+{% call C.ui_td(type='number', hook_class='') %}
+{{ C.ui_text(text=order.task_count, variant='small') }}
+{% endcall %}
+
+{# Status #}
+{% call C.ui_td(type='status') %}
+{{ C.ui_status_badge(kind='order', value=order.status) }}
+{% endcall %}
+
+{# Date #}
+{% call C.ui_td(type='date', hook_class='') %}
+{{ C.ui_text(text=C.ui_fmt_date(order.received_date), variant='small', tone='subtle') }}
+{% endcall %}
+
+{# Due Date #}
+{% call C.ui_td(type='date') %}
+{{ C.ui_text(text=C.ui_fmt_date(order.due_date) if order.due_date else '', variant='small', tone='subtle') }}
+{% endcall %}
+
+{# Remaining #}
+{% call C.ui_td() %}
+{% if order.due_in_days is not none %}
+{% if order.due_in_days >= 0 %}
+{{ C.ui_text(text=t('order.due.remaining', days=order.due_in_days), variant='small', tone='success' if order.due_in_days
+> 2 else 'warning') }}
+{% else %}
+{{ C.ui_text(text=t('order.due.overdue', days=-order.due_in_days), variant='small', tone='danger') }}
+{% endif %}
+{% endif %}
+{% endcall %}
+
+{# Note #}
+{% call C.ui_td(type='note') %}
+{{ C.ui_text(text=order.note or '', variant='small', tone='subtle') }}
+{% endcall %}
+
+{# Actions #}
+{% call C.ui_td(type='action') %}
+{% call L.ui_stack(spacing=2, direction='row', hook_class='ui-actionbar') %}
+{{ A.ui_action_link(label=None, href=url_for('ui_order.order_view', id=order.id), icon='eye', tone='neutral',
+u_props='title="' ~ t('common.view') ~ '" aria-label="' ~ t('common.view') ~ '"') }}
+
+{% if is_operator() %}
+{{ A.ui_action_link(label=None, href=url_for('ui_order.order_edit', id=order.id), icon='pencil', tone='neutral',
+u_props='title="' ~ t('common.edit') ~ '" aria-label="' ~ t('common.edit') ~ '" data-hook="edit-order-button"') }}
+
+{% if order.can_delete %}
+{{ A.ui_action_link(label=None, href=url_for('ui_order.order_delete', id=order.id), icon='trash', tone='danger',
+u_props='title="' ~ t('common.delete') ~ '" aria-label="' ~ t('common.delete') ~ '"
+data-hook="delete-order-button"') }}
+{% endif %}
+{% endif %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% endcall %}
+{{ C.ui_pagination(pagination, endpoint='ui_order.order_list') }}
+{% endcall %}
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{{ L.ui_page_header(title=t('fabric.new.title')) }}
+
+{% call L.ui_container() %}
+{% call L.ui_grid(cols=1) %}
+{% call C.ui_card() %}
+{% call F.ui_form(method='POST', spacing=6) %}
+{{ F.ui_input(name='fabric_code', label=t('fabric.fields.code'), required=True) }}
+{{ F.ui_input(name='material', label=t('fabric.fields.material')) }}
+
+{% call L.ui_grid(cols=2) %}
+{{ F.ui_input(name='width_cm', label=t('fabric.fields.width_cm'), type='number', u_props='step="0.1"') }}
+{{ F.ui_input(name='yard_weight_gyd', label=t('fabric.fields.yard_weight_gyd'), type='number', u_props='step="0.1"')
+}}
+{% endcall %}
+
+{% call L.ui_stack(justify='end', spacing=3) %}
+{{ F.ui_button(label=t('common.cancel'), variant='secondary', href=url_for('ui_fabric.fabric_list')) }}
+{{ F.ui_button(label=t('common.submit'), type='submit', variant='primary') }}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endblock %}
+

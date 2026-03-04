@@ -1,0 +1,254 @@
+{# Layout Macros #}
+{% import 'macros/ui/base.html' as A %}
+{% import 'macros/ui/forms.html' as F %}
+{% macro ui_shell(current_user=None) -%}
+{% call ui_app_shell(current_user=current_user) %}
+{% if caller %}
+{{ caller() }}
+{% endif %}
+{% endcall %}
+{%- endmacro %}
+
+{% macro ui_app_shell(current_user=None, width='7xl') -%}
+<!DOCTYPE html>
+<html lang="{{ get_locale() }}" class="h-full bg-slate-50">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HopaoEMS v2</title>
+    <!-- CSS Policy: Only approved global styles -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css', v=asset_version) }}">
+
+</head>
+
+<body class="h-full flex flex-col font-sans antialiased text-slate-900">
+    {# Topbar #}
+    {% set header_cls = 'ui-shell__header grid
+    grid-cols-[var(--ui-shell-header-side-w)_1fr_var(--ui-shell-header-side-w)] h-[var(--ui-header-h)] items-center px-4
+    md:px-6' %}
+    <header class="ui-shell__topbar">
+        <div class="{{ header_cls }}">
+            {# Side: Logo #}
+            <div class="flex items-center">
+                <a href="/" class="flex items-center gap-2">
+                    <span class="text-xl font-bold tracking-tight text-slate-900">HopaoEMS</span>
+                    <span
+                        class="px-1.5 py-0.5 rounded bg-slate-900 text-white text-[10px] font-bold uppercase">v2</span>
+                </a>
+            </div>
+
+            {# Center: Navigation Slots (Equal Width) #}
+            {% if current_user %}
+            <nav class="ui-shell__nav grid grid-flow-col auto-cols-fr h-full">
+                {{ ui_shell_nav_item(t('nav.dashboard'), url_for('ui.index'), icon='house', active=(request.endpoint ==
+                'ui.index')) }}
+                {{ ui_shell_nav_item(t('nav.fabrics'), url_for('ui_fabric.fabric_list'), icon='archive',
+                active=(request.blueprint == 'ui_fabric')) }}
+                {{ ui_shell_nav_item(t('nav.samples'), url_for('ui_sample.sample_list'), icon='images',
+                active=(request.blueprint == 'ui_sample')) }}
+                {{ ui_shell_nav_item(t('nav.orders'), url_for('ui_order.order_list'), icon='file-text',
+                active=(request.blueprint == 'ui_order')) }}
+                {{ ui_shell_nav_item(t('nav.production'), url_for('ui_production.production_dashboard'), icon='inboxes',
+                active=(request.blueprint == 'ui_production')) }}
+                {{ ui_shell_nav_item(t('nav.wash'), url_for('ui_wash.wash_list'), icon='droplet',
+                active=(request.blueprint == 'ui_wash')) }}
+                {{ ui_shell_nav_item(t('nav.inks'), url_for('ui_ink.ink_list'), icon='palette',
+                active=(request.blueprint == 'ui_ink')) }}
+            </nav>
+            {% else %}
+            <div></div> {# Empty container for center slot when logged out #}
+            {% endif %}
+
+            {# Side: User Hub (Fixed 12rem) #}
+            <div class="ui-shell__user flex justify-end items-center gap-2">
+                {# Language Switcher (Always available) #}
+                <div class="relative">
+                    <button type="button" data-action="lang-menu-toggle" data-target="lang-menu"
+                        class="ui-action-icon-only text-slate-500 hover:text-slate-900" aria-expanded="false"
+                        aria-haspopup="true" title="{{ t('common.language') }}">
+                        <i class="bi bi-globe2"></i>
+                    </button>
+                    {% call A.ui_popover('lang-menu', u_props='class="z-[100]"') %}
+                    <a href="{{ url_for(request.endpoint, lang='en', **request.view_args) }}"
+                        class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                        data-action="lang-menu-select">English</a>
+                    <a href="{{ url_for(request.endpoint, lang='zh-TW', **request.view_args) }}"
+                        class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                        data-action="lang-menu-select">繁體中文</a>
+                    <a href="{{ url_for(request.endpoint, lang='vi', **request.view_args) }}"
+                        class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                        data-action="lang-menu-select">Tiếng Việt</a>
+                    {% endcall %}
+                </div>
+
+                {% if current_user %}
+                <div
+                    class="ui-shell__user-text text-right leading-tight hidden md:flex flex-col min-w-0 max-w-[var(--ui-shell-header-side-w)]">
+                    <span class="text-sm font-semibold text-slate-800 truncate">{{ current_user['username'] }}</span>
+                    <span class="text-[10px] font-medium text-slate-500 uppercase truncate">{{ t('role.' ~
+                        current_user['role']) }}</span>
+                </div>
+
+                <form action="{{ url_for('auth.logout') }}" method="POST" class="contents">
+                    <button type="submit" class="ui-action-icon-only text-slate-500 hover:text-red-600"
+                        title="{{ t('auth.logout') }}">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </button>
+                </form>
+                {% else %}
+                <a href="{{ url_for('auth.login') }}" class="text-sm font-medium text-slate-600 hover:text-slate-900">
+                    {{ t('shell.login') }}
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    {# Main Content Area #}
+    <main class="flex-1 overflow-y-auto py-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {# Flash Messages #}
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="mb-6 space-y-2">
+                {% for category, message in messages %}
+                {% set color = 'bg-emerald-50 text-emerald-700 border-emerald-200' if category == 'success' else
+                'bg-rose-50 text-rose-700 border-rose-200' if category == 'danger' else
+                'bg-blue-50 text-blue-700 border-blue-200' %}
+                <div class="p-4 rounded-md border {{ color }}">
+                    {% if '.' in message and ' ' not in message %}
+                    {{ t(message) }}
+                    {% else %}
+                    {{ message }}
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            {% if caller %}
+            {{ caller() }}
+            {% endif %}
+        </div>
+    </main>
+
+    {# Global Scripts #}
+    <script src="/static/vendor/utif/utif.min.js"></script>
+    <script src="/static/js/ui.js?v={{ asset_version }}"></script>
+    <script src="/static/js/ui/sidebar_toggle.js?v={{ asset_version }}"></script>
+    <script src="/static/js/ui/sample_preview.js?v={{ asset_version }}"></script>
+    <script src="/static/js/ui/sample_form_sections.js?v={{ asset_version }}"></script>
+    <script src="/static/js/ui/production_task_logs.js?v={{ asset_version }}"></script>
+    <script src="/static/js/ui/wash_list.js?v={{ asset_version }}"></script>
+    <script src="/static/js/ui/fabric_stock_in.js?v={{ asset_version }}"></script>
+    <script src="/static/js/ui/fabric_explorer.js?v={{ asset_version }}"></script>
+    <script src="/static/js/ui/fabric_list_view_mode.js?v={{ asset_version }}"></script>
+    <script src="/static/js/ui/sample_list.js?v={{ asset_version }}"></script>
+    <script src="/static/js/ui/sample_list_view_mode.js?v={{ asset_version }}"></script>
+    <script src="/static/js/ui/sample_card_hover.js?v={{ asset_version }}"></script>
+    <script src="/static/js/ui/order_form_items.js?v={{ asset_version }}"></script>
+</body>
+
+</html>
+{%- endmacro %}
+
+{% macro ui_shell_nav_item(label, href, icon, active=False) -%}
+<a href="{{ href }}"
+    class="flex items-center justify-center gap-2 border-b-2 px-1 text-sm font-medium transition-colors {{ 'border-slate-900 text-slate-900' if active else 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700' }}">
+    <i class="bi bi-{{ icon }}"></i>
+    <span>{{ label }}</span>
+</a>
+{%- endmacro %}
+
+{% macro ui_container(u_props='') -%}
+<div class="space-y-6 ui-page-container" {{ u_props|safe }}>
+    {% if caller %}
+    {{ caller() }}
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro ui_grid(cols=1, gap=4, hook_class='', u_props='') -%}
+<div class="grid grid-cols-1 md:grid-cols-{{ cols }} gap-{{ gap }} {{ hook_class }}" {{ u_props|safe }}>
+    {% if caller %}
+    {{ caller() }}
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro ui_col(span=1, hook_class='', u_props='') -%}
+<div class="col-span-12 md:col-span-{{ span }} {{ hook_class }}" {{ u_props|safe }}>
+    {% if caller %}
+    {{ caller() }}
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro ui_stack(direction='col', spacing=4, align='start', justify='start', items=None, hook_class='', u_props='') -%}
+{% set d = 'flex-col' if direction == 'col' else 'flex-row' %}
+<div class="flex {{ d }} gap-{{ spacing }} items-{{ align }} justify-{{ justify }} {{ hook_class }}" {{ u_props|safe }}>
+    {% if items %}
+    {% for item in items %}
+    {{ item }}
+    {% endfor %}
+    {% elif caller %}
+    {{ caller() }}
+    {% endif %}
+</div>
+{%- endmacro %}
+
+
+{% macro ui_box(flex=None, w=None, hook_class='', u_props='') -%}
+{% set f = 'flex-' ~ flex if flex else '' %}
+{% set width = 'w-' ~ w if w else '' %}
+<div class="{{ f }} {{ width }} {{ hook_class }}" {{ u_props|safe }}>
+    {% if caller %}
+    {{ caller() }}
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro ui_center_box(size='md', hook_class='', u_props='') -%}
+{% set max_w = 'max-w-' ~ size %}
+<div class="{{ max_w }} w-full mx-auto {{ hook_class }}" {{ u_props|safe }}>
+    {% if caller %}
+    {{ caller() }}
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro ui_page_header(title, description=None, actions=None) -%}
+<div class="md:flex md:items-center md:justify-between mb-6">
+    <div class="min-w-0 flex-1">
+        <h2 class="text-2xl font-bold leading-7 text-slate-900 sm:truncate sm:text-3xl sm:tracking-tight">{{ title }}
+        </h2>
+        {% if description %}
+        <p class="mt-1 text-sm text-slate-500">{{ description }}</p>
+        {% endif %}
+    </div>
+    {% if actions %}
+    <div class="mt-4 flex flex-none md:ml-4 md:mt-0">
+        {{ actions }}
+    </div>
+    {% elif caller %}
+    <div class="mt-4 flex flex-none md:ml-4 md:mt-0">
+        {{ caller() }}
+    </div>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro ui_form_footer(actions=None, hook_class='', u_props='') -%}
+<div class="mt-10 pt-8 border-t border-slate-200 flex justify-between items-center gap-4 {{ hook_class }}" {{
+    u_props|safe }}>
+    {% if actions %}
+    {{ actions }}
+    {% elif caller %}
+    {{ caller() }}
+    {% endif %}
+</div>
+{%- endmacro %}

@@ -1,0 +1,14 @@
+{# Foundation - Base styles and tokens #}
+
+{% macro icon(name, tone=None, class='') -%}
+{% set tones = {
+'success': 'text-emerald-500',
+'danger': 'text-rose-500',
+'warning': 'text-amber-500',
+'info': 'text-blue-500',
+'neutral': 'text-slate-500'
+} %}
+{% set color_class = tones.get(tone, '') if tone else '' %}
+<i class="bi bi-{{ name }} {{ color_class }} {{ class }}"></i>
+{%- endmacro %}
+

@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+
+{% block content %}
+{% set header_actions %}
+{{ F.ui_button(label=t('common.back'), variant='secondary', href=url_for('ui_order.order_list'), icon='arrow-left') }}
+{% endset %}
+
+{{ L.ui_page_header(
+title=t('order.view.title_with_no', order_no=order.order_no),
+actions=header_actions
+) }}
+
+{% call L.ui_container() %}
+{% if is_operator() and not can_delete %}
+{% call C.ui_alert(tone='info') %}
+{{ t('order.delete.not_allowed_has_logs') }}
+{% endcall %}
+{% endif %}
+
+{# 1. Summary Statistics #}
+{% call L.ui_grid(cols=4, gap=4) %}
+{# Status #}
+{% call C.ui_stat_card(label=t('common.status')) %}
+{{ C.ui_status_badge(kind='order', value=order.status) }}
+{% endcall %}
+
+{# Task Counts (Simplified) #}
+{{ C.ui_stat_card(label=t('order.dossier.summary.task_counts'), value=order.tasks|length) }}
+
+{# Unwashed #}
+{% call C.ui_stat_card(label=t('order.dossier.summary.total_unwashed'), tone='warning' if total_unwashed_count > 0 else
+'neutral') %}
+{{ C.ui_unwashed_metric(count=total_unwashed_count, length_m=total_unwashed_length) }}
+{% endcall %}
+
+{# Due Date #}
+{{ C.ui_stat_card(label=t('order.fields.due_date'), value=order.due_date or t('common.none')) }}
+{% endcall %}
+
+{# 2. Note (Conditional) #}
+{% if order.note %}
+{% call C.ui_card(title=t('common.note')) %}
+{{ C.ui_text(text=order.note) }}
+{% endcall %}
+{% endif %}
+
+{# 3. Order Items (Master Data) #}
+{% call C.ui_card(title=t('order.items_list')) %}
+{% call C.ui_table(headers=[
+t('fabric.fields.code'),
+t('sample.fields.title'),
+{'label': t('order.fields.qty'), 'align': 'right'},
+t('common.note'),
+{'label': t('common.actions'), 'align': 'right'}
+], density='compact') %}
+{% for item in order.order_items %}
+{% call C.ui_tr() %}
+{% call C.ui_td() %}{{ item.fabric_code }}{% endcall %}
+{% call C.ui_td() %}{{ item.sample_title or item.sample_id }}{% endcall %}
+{% call C.ui_td(align='right', hook_class='') %}{{ item.qty }}{% endcall %}
+{% call C.ui_td() %}
+{{ C.ui_text(text=item.note or t('common.none'), variant='small', tone='subtle') }}
+{% endcall %}
+{% call C.ui_td(align='right') %}
+{% if is_operator() and item.log_count == 0 %}
+{{ A.ui_action_link(label=None, href=url_for('ui_order.order_item_delete', item_id=item.id), icon='trash',
+tone='danger', u_props='title="' ~ t('common.delete') ~ '" aria-label="' ~ t('common.delete') ~ '"
+data-hook="order-item-delete-link" data-action="delete"') }}
+{% endif %}
+{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% endcall %}
+
+{# 4. Tasks (Production) #}
+{% call C.ui_card(title=t('order.dossier.tasks')) %}
+{% call C.ui_table(headers=[
+t('fabric.fields.code'),
+t('sample.fields.title'),
+{'label': t('production.summary.target_qty'), 'align': 'right'},
+{'label': t('production.progress.printed'), 'align': 'right'},
+{'label': t('production.progress.washed'), 'align': 'right'},
+{'label': t('order.list.col.unwashed'), 'align': 'right'},
+t('common.status'),
+{'label': t('common.actions'), 'align': 'right'}
+], density='compact') %}
+{% for task in order.tasks %}
+{% call C.ui_tr() %}
+{% call C.ui_td() %}{{ task.fabric_no }}{% endcall %}
+{% call C.ui_td() %}{{ task.sample_title or task.sample_id }}{% endcall %}
+{% call C.ui_td(align='right', hook_class='') %}{{ task.target_qty }}{% endcall %}
+{% call C.ui_td(align='right', hook_class='') %}{{ C.ui_fmt_length_m(task.total_printed or 0) }}{% endcall
+%}
+{% call C.ui_td(align='right', hook_class='') %}{{ C.ui_fmt_length_m(task.total_washed or 0) }}{% endcall %}
+
+{# Unwashed #}
+{% call C.ui_td(align='right', hook_class='') %}
+{{ C.ui_unwashed_metric(count=task.unwashed_count) }}
+{% endcall %}
+
+{# Status #}
+{% call C.ui_td() %}
+{{ C.ui_status_badge(kind='task', value=task.status) }}
+{% endcall %}
+
+{# Actions #}
+{% call C.ui_td(align='right') %}
+{% set view_link = A.ui_action_link(label=None, href=url_for('ui_production.production_task_view', id=task.id),
+icon='eye', tone='neutral', u_props='title="' ~ t('common.view') ~ '" aria-label="' ~ t('common.view') ~ '"') %}
+
+{% set reopen_link = None %}
+{% if task.status == 'done' and is_operator() %}
+{% set reopen_link %}
+{% call F.ui_form(action=url_for('ui_order.task_reopen', task_id=task.id), method='POST', hook_class='') %}
+{{ F.ui_button(label=None, type='submit', variant='ghost', size='xs',
+icon='arrow-counterclockwise', u_props='data-hook="reopen-task-button" title="' ~ t('order.action.reopen_task') ~ '"
+aria-label="' ~ t('order.action.reopen_task') ~ '"')
+}}
+{% endcall %}
+{% endset %}
+{% endif %}
+
+{{ C.ui_row_actions_fixed(slot1=view_link, slot2=reopen_link) }}
+{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% endcall %}
+
+{# 5. Wash Sessions #}
+{% if order.wash_sessions %}
+{% call C.ui_card(title=t('order.dossier.sessions')) %}
+{% call C.ui_table(headers=[
+t('wash.undo.vat'),
+{'label': t('wash.summary.rolls'), 'align': 'right'},
+{'label': t('wash.summary.total_length'), 'align': 'right'},
+t('wash.fields.washed_at')
+], density='compact') %}
+{% for s in order.wash_sessions %}
+{% call C.ui_tr() %}
+{% call C.ui_td() %}{{ s.vat_code }}{% endcall %}
+{% call C.ui_td(align='right', hook_class='') %}{{ s.roll_count }}{% endcall %}
+{% call C.ui_td(align='right', hook_class='') %}{{ C.ui_fmt_length_m(s.total_length) }}{% endcall %}
+{% call C.ui_td(hook_class='') %}{{ C.ui_fmt_dt_min(s.created_at) }}{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% endcall %}
+{% endif %}
+
+{% endcall %}
+{% endblock %}

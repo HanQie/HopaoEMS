@@ -1,0 +1,1127 @@
+{
+  "tables": {
+    "audit_logs": {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "operator_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "action",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "target_entity",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "target_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "timestamp",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        },
+        {
+          "default": null,
+          "name": "details",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "operator_id",
+          "on_delete": "NO ACTION",
+          "on_update": "NO ACTION",
+          "table": "users",
+          "to": "id"
+        }
+      ],
+      "indexes": []
+    },
+    "cylinders": {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "fabric_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "cylinder_no",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "fabric_id",
+          "on_delete": "NO ACTION",
+          "on_update": "NO ACTION",
+          "table": "fabrics",
+          "to": "id"
+        }
+      ],
+      "indexes": []
+    },
+    "fabrics": {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "fabric_code",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "material",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "width_cm",
+          "notnull": 0,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": null,
+          "name": "yard_weight_gyd",
+          "notnull": 0,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        },
+        {
+          "default": null,
+          "name": "width_mm",
+          "notnull": 0,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": null,
+          "name": "remark",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "columns": [
+            "fabric_code"
+          ],
+          "name": "sqlite_autoindex_fabrics_1",
+          "unique": 1
+        }
+      ]
+    },
+    "inks": {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "date",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "type",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "color",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "qty",
+          "notnull": 0,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": null,
+          "name": "note",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": []
+    },
+    "order_items": {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "order_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "fabric_no",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "sample_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "qty",
+          "notnull": 0,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": null,
+          "name": "note",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "order_id",
+          "on_delete": "NO ACTION",
+          "on_update": "NO ACTION",
+          "table": "orders",
+          "to": "id"
+        },
+        {
+          "from": "sample_id",
+          "on_delete": "NO ACTION",
+          "on_update": "NO ACTION",
+          "table": "samples",
+          "to": "id"
+        }
+      ],
+      "indexes": []
+    },
+    "orders": {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "order_no",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "received_date",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "due_date",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "'pending'",
+          "name": "status",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "note",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "columns": [
+            "order_no"
+          ],
+          "name": "sqlite_autoindex_orders_1",
+          "unique": 1
+        }
+      ]
+    },
+    "production_logs": {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "task_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "roll_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "length",
+          "notnull": 1,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": null,
+          "name": "note",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "0",
+          "name": "roll_depleted",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "washed_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        },
+        {
+          "default": null,
+          "name": "wash_session_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "operator_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": "'unwashed'",
+          "name": "status",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "task_id",
+          "on_delete": "NO ACTION",
+          "on_update": "NO ACTION",
+          "table": "production_tasks",
+          "to": "id"
+        },
+        {
+          "from": "roll_id",
+          "on_delete": "NO ACTION",
+          "on_update": "NO ACTION",
+          "table": "rolls",
+          "to": "id"
+        },
+        {
+          "from": "operator_id",
+          "on_delete": "NO ACTION",
+          "on_update": "NO ACTION",
+          "table": "users",
+          "to": "id"
+        },
+        {
+          "from": "wash_session_id",
+          "on_delete": "NO ACTION",
+          "on_update": "NO ACTION",
+          "table": "wash_sessions",
+          "to": "id"
+        }
+      ],
+      "indexes": []
+    },
+    "production_tasks": {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "order_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "order_item_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "sample_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "fabric_no",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "target_qty",
+          "notnull": 0,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": "0",
+          "name": "used_length",
+          "notnull": 0,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": "'pending'",
+          "name": "status",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "note",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "order_item_id",
+          "on_delete": "NO ACTION",
+          "on_update": "NO ACTION",
+          "table": "order_items",
+          "to": "id"
+        },
+        {
+          "from": "order_id",
+          "on_delete": "NO ACTION",
+          "on_update": "NO ACTION",
+          "table": "orders",
+          "to": "id"
+        },
+        {
+          "from": "sample_id",
+          "on_delete": "NO ACTION",
+          "on_update": "NO ACTION",
+          "table": "samples",
+          "to": "id"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "order_item_id"
+          ],
+          "name": "sqlite_autoindex_production_tasks_1",
+          "unique": 1
+        }
+      ]
+    },
+    "roll_history": {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "roll_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "action",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "old_qty",
+          "notnull": 0,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": null,
+          "name": "new_qty",
+          "notnull": 0,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": null,
+          "name": "delta",
+          "notnull": 0,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": null,
+          "name": "source",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "note",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "created_by",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "roll_id",
+          "on_delete": "NO ACTION",
+          "on_update": "NO ACTION",
+          "table": "rolls",
+          "to": "id"
+        }
+      ],
+      "indexes": []
+    },
+    "rolls": {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "cylinder_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "roll_no",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "length_m",
+          "notnull": 1,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": null,
+          "name": "weight_kg",
+          "notnull": 0,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": "'in_stock'",
+          "name": "status",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "remark",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "cylinder_id",
+          "on_delete": "NO ACTION",
+          "on_update": "NO ACTION",
+          "table": "cylinders",
+          "to": "id"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "cylinder_id",
+            "roll_no"
+          ],
+          "name": "idx_rolls_cylinder_roll",
+          "unique": 1
+        }
+      ]
+    },
+    "sample_color_map": {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "sample_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "pick_x",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "pick_y",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "rgb_r",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "rgb_g",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "rgb_b",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "hex",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "note",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "'note'",
+          "name": "target_mode",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "target_l",
+          "notnull": 0,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": null,
+          "name": "target_a",
+          "notnull": 0,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": null,
+          "name": "target_b",
+          "notnull": 0,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": null,
+          "name": "target_note",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "sample_id",
+          "on_delete": "NO ACTION",
+          "on_update": "NO ACTION",
+          "table": "samples",
+          "to": "id"
+        }
+      ],
+      "indexes": []
+    },
+    "samples": {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "sample_no",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "title",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "remark",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "fabric_no",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "sales_code",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "version",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "date_received",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "source_filename",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "source_mime",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "source_path",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "preview_path",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "preview_mime",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "preview_size",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        },
+        {
+          "default": null,
+          "name": "printing_environment",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "printing_file_name",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "columns": [
+            "sample_no"
+          ],
+          "name": "sqlite_autoindex_samples_1",
+          "unique": 1
+        }
+      ]
+    },
+    "users": {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "username",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "password_hash",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "'viewer'",
+          "name": "role",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "columns": [
+            "username"
+          ],
+          "name": "sqlite_autoindex_users_1",
+          "unique": 1
+        }
+      ]
+    },
+    "wash_sessions": {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "vat_code",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "roll_count",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "total_length",
+          "notnull": 1,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "default": null,
+          "name": "operator_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TIMESTAMP"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "operator_id",
+          "on_delete": "NO ACTION",
+          "on_update": "NO ACTION",
+          "table": "users",
+          "to": "id"
+        }
+      ],
+      "indexes": []
+    }
+  },
+  "version": 1
+}

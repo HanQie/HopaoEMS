@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+
+{% block content %}
+{{ L.ui_page_header(
+title=t('production.log.delete.title'),
+actions=F.ui_button(label=t('common.cancel'), variant='secondary', href=url_for('ui_production.production_task_view',
+id=log.task_id))
+) }}
+
+{% call L.ui_container() %}
+{% call C.ui_card() %}
+{% call L.ui_stack(direction='col', spacing=6) %}
+{% call C.ui_alert(tone='danger') %}
+{{ t('production.log.delete.confirm') }}
+{% endcall %}
+
+{% if log.washed_at or log.wash_session_id %}
+{% call C.ui_alert(tone='warning') %}
+{{ t('production.log.delete.warning_auto_undo') }}
+{% endcall %}
+{% endif %}
+{% endcall %}
+
+{% call L.ui_stack(direction='col', spacing=4) %}
+{{ C.ui_text(text=t('production.log.vat_code') ~ ': ' ~ log.vat_code, variant='body') }}
+{{ C.ui_text(text=t('fabric.fields.roll_no') ~ ': ' ~ log.roll_no, variant='body') }}
+{{ C.ui_text(text=t('production.logs.length') ~ ': ' ~ log.length ~ 'm', variant='body') }}
+{{ C.ui_text(text=t('production.logs.date') ~ ': ' ~ log.created_at, variant='body') }}
+{% if log.sample_title %}
+{{ C.ui_text(text=t('sample.fields.title') ~ ': ' ~ log.sample_title, variant='body') }}
+{% endif %}
+{% endcall %}
+
+{% call F.ui_form(action=url_for('ui_production.production_log_delete', id=log.id), method='POST') %}
+{% call L.ui_stack(align='end', spacing=4) %}
+{{ F.ui_button(label=t('common.cancel'), variant='secondary', href=url_for('ui_production.production_task_view',
+id=log.task_id)) }}
+{{ F.ui_button(label=t('common.delete'), type='submit', variant='danger') }}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+
+{% block content %}
+{% set header_actions %}
+{{ F.ui_button(label=t('common.back'), variant='secondary',
+href=url_for('ui_production.production_dashboard'), icon='arrow-left') }}
+{% endset %}
+
+{{ L.ui_page_header(
+title=t('production.task.title') ~ ' #' ~ task.id,
+actions=header_actions
+) }}
+
+{% call L.ui_container(u_props='data-hook="production-task-root"') %}
+
+{# ── B. Summary Row (2 columns) ── #}
+{% call L.ui_grid(cols=2) %}
+
+{# Left: Task Info Card #}
+{% call C.ui_card(title=t('production.task.info')) %}
+{% call L.ui_stack(direction='row', spacing=4, align='center') %}
+{{ C.ui_sample_thumb(preview_path=task.preview_path, size='lg') }}
+{% call L.ui_stack(spacing=1) %}
+{{ C.ui_text(text=task.sample_title, variant='h3') }}
+{{ C.ui_text(text='#' ~ task.sample_id, variant='small', tone='subtle') }}
+{% endcall %}
+{% endcall %}
+
+{% call L.ui_box(hook_class='') %}
+{% call L.ui_grid(cols=1, gap=3) %}
+{% call L.ui_stack(direction='row', spacing=2, align='center') %}
+{{ C.ui_text(text=t('order.fields.order_no') ~ ':', tone='subtle', variant='small') }}
+{{ A.ui_link(label=task.order_no, href=url_for('ui_order.order_view', id=task.order_id), size='sm') }}
+{% endcall %}
+{% call L.ui_stack(direction='row', spacing=2, align='center') %}
+{{ C.ui_text(text=t('common.status') ~ ':', tone='subtle', variant='small') }}
+{{ C.ui_status_badge('task', task.status) }}
+{% endcall %}
+{% call L.ui_stack(direction='row', spacing=2, align='center') %}
+{{ C.ui_text(text=t('fabric.fields.code') ~ ':', tone='subtle', variant='small') }}
+{{ C.ui_text(text=task.fabric_no, variant='small', bold=True) }}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+
+{# Right: Progress Card #}
+{% call C.ui_card(title=t('production.progress.title')) %}
+{% call L.ui_stack(direction='col', spacing=4) %}
+
+{# Progress Bar #}
+{{ C.ui_progress_bar(task.progress_pct,
+aria_label_key=t('production.progress.aria_label'),
+tone='success' if task.progress_pct >= 100 else 'primary',
+printed_m=task.printed_length_m, target_m=task.target_length_m) }}
+
+{# KPI Grid: Washed / To Wash / Pending Count #}
+{% set stats = [
+{'label': t('production.progress.washed'), 'value': C.ui_fmt_length_m(task.washed or 0), 'tone': 'success'},
+{'label': t('production.progress.to_wash'), 'value': C.ui_fmt_length_m(task.to_wash or 0), 'tone': 'info'},
+{'label': t('order.list.col.unwashed'), 'value': task.pending_wash_count or 0, 'hint': t('common.logs')}
+] %}
+{% call L.ui_box(hook_class='') %}
+{{ C.ui_stat_grid(items=stats, cols=3) }}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+
+{% endcall %}{# /ui_grid #}
+
+{# ── D. Logs Section ── #}
+{% set log_actions %}
+{% if is_operator() and task.status == 'printing' %}
+{% call L.ui_stack(direction='row', spacing=3) %}
+{{ F.ui_button(
+label=t('production.action.produce'),
+href=url_for('ui_production.production_task_produce', id=task.id),
+icon='plus', variant='secondary', size='sm', u_props='data-hook="produce-button"') }}
+
+{% if task.can_complete %}
+{% call F.ui_form(method="POST",
+action=url_for('ui_production.production_task_done', id=task.id),
+hook_class='') %}
+{{ F.ui_button(label=t('production.action.complete'), type='submit',
+variant='primary', icon='check-lg', size='sm', u_props='data-hook="done-button"') }}
+{% endcall %}
+{% endif %}
+{% endcall %}
+{% endif %}
+{% endset %}
+
+{% call C.ui_card(title=t('production.logs.title'), actions=log_actions, hook_class='') %}
+{% call C.ui_table(headers=[
+{'label': t('production.logs.date'), 'type': 'date'},
+t('production.log.vat_code'),
+t('fabric.fields.roll_no'),
+{'label': t('production.logs.length'), 'type': 'number'},
+{'label': t('common.status'), 'type': 'status'},
+{'label': t('common.actions'), 'type': 'action'}
+]) %}
+{% for log in logs %}
+{% call C.ui_tr(u_props='id="log-' ~ log.id ~ '"') %}
+{# Date #}
+{% call C.ui_td(type='date', hook_class='') %}{{ C.ui_fmt_dt_min(log.created_at) }}{% endcall %}
+{% call C.ui_td() %}{{ log.vat_code or '-' }}{% endcall %}
+{% call C.ui_td() %}{{ log.roll_no or '-' }}{% endcall %}
+{% call C.ui_td(type='number', hook_class='') %}{{ C.ui_fmt_length_m(log.length) }}{% endcall %}
+{# Status #}
+{% call C.ui_td(type='status') %}
+{{ C.ui_status_badge('wash', 'washed' if log.washed_at else 'unwashed', ts=log.washed_at) }}
+{% endcall %}
+{% call C.ui_td(type='action') %}
+{% set view_log = A.ui_action_link(href=url_for('ui_production.production_log_edit', id=log.id),
+icon='pencil', tone='neutral', label=None,
+u_props='title="' ~ t('common.edit') ~ '" aria-label="' ~ t('common.edit') ~ '"') if is_operator() and log.is_editable
+else None %}
+
+{% set delete_log = A.ui_action_link(href=url_for('ui_production.production_log_delete', id=log.id),
+icon='trash', tone='danger', label=None,
+u_props='title="' ~ t('common.delete') ~ '" aria-label="' ~ t('common.delete') ~ '"') if is_operator() and
+log.is_deletable else None %}
+
+{% set undo_wash = A.ui_action_link(href=url_for('ui_production.production_log_undo_wash', id=log.id),
+icon='arrow-counterclockwise', tone='warning', label=None,
+u_props='title="' ~ t('production.log.action.undo_wash') ~ '" aria-label="' ~ t('production.log.action.undo_wash') ~
+'"') if is_operator() and (log.washed_at or log.wash_session_id) else None %}
+
+{{ C.ui_row_actions_fixed(slot1=view_log, slot2=delete_log, slot3=undo_wash) }}
+{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% endcall %}
+
+{% endcall %}{# /container #}
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+
+{% block content %}
+{% set header_actions %}
+{% call L.ui_stack(direction='row', spacing=3) %}
+{% if is_operator() %}
+{{ F.ui_button(label=t('wash.action.revoke'), variant='danger', href=url_for('ui_wash.wash_revoke',
+session_id=session.id), icon='x-circle', u_props='data-hook="revoke-session-button"') }}
+{% endif %}
+{{ F.ui_button(label=t('common.back'), variant='secondary', href=url_for('ui_wash.wash_history')) }}
+{% endcall %}
+{% endset %}
+
+{{ L.ui_page_header(
+title=t('wash.session.label') ~ ' #' ~ session.id,
+actions=header_actions
+) }}
+
+{% call L.ui_container() %}
+
+{# 1. Summary Statistics #}
+{% set task_ids = session.logs|map(attribute='task_id')|unique|list %}
+{{ C.ui_stat_grid(items=[
+{'label': t('common.vat'), 'value': session.vat_code, 'tone': 'info'},
+{'label': t('wash.summary.rolls'), 'value': session.roll_count, 'tone': 'neutral'},
+{'label': t('wash.summary.total_length'), 'value': C.ui_fmt_length_m(session.total_length), 'tone': 'neutral'},
+{'label': t('order.list.col.tasks'), 'value': task_ids|length, 'tone': 'neutral'}
+], cols=4) }}
+
+{# 2. Info Card #}
+{% call C.ui_card(title=t('common.information')) %}
+{% call L.ui_grid(cols=2, gap=6) %}
+{% call L.ui_stack(spacing=1) %}
+{{ C.ui_label(t('common.operator')) }}
+{{ C.ui_text(session.operator_name or t('common.unknown')) }}
+{% endcall %}
+{% call L.ui_stack(spacing=1) %}
+{{ C.ui_label(t('wash.fields.washed_at')) }}
+{{ C.ui_text(C.ui_fmt_dt_min(session.created_at)) }}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+
+{# 3. Included Logs #}
+{% call C.ui_card(title=t('production.logs.title')) %}
+{% call C.ui_table(headers=[
+t('fabric.fields.roll_no'),
+t('fabric.fields.fabric_no'),
+t('common.length'),
+t('sample.fields.title'),
+t('order.fields.order_no'),
+t('production.fields.task_id')
+], density='compact') %}
+{% for log in session.logs %}
+{% call C.ui_tr() %}
+{% call C.ui_td() %}{{ log.roll_no or '-' }}{% endcall %}
+{% call C.ui_td() %}{{ log.fabric_code or '-' }}{% endcall %}
+{% call C.ui_td() %}{{ C.ui_fmt_length_m(log.length) }}{% endcall %}
+{% call C.ui_td() %}{{ log.sample_title or '-' }}{% endcall %}
+{% call C.ui_td() %}{{ log.order_no or '-' }}{% endcall %}
+{% call C.ui_td() %}
+{{ A.ui_link(label='#' ~ log.task_id, href=url_for('ui_production.production_task_view', id=log.task_id)) }}
+{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% endcall %}
+
+{% endcall %}
+{% endblock %}

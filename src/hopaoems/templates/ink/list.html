@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block page_width %}full{% endblock %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+
+{% block content %}
+{{ L.ui_page_header(title=t('ink.list.title'), description=t('ink.list.desc')) }}
+
+{% call L.ui_container() %}
+{# Toolbar (Strict Phase 6) #}
+{{ C.ui_list_toolbar(
+search_key='ink',
+search_placeholder=t('common.search'),
+secondary_actions=(F.ui_button(label=t('ink.action.new'), href=url_for('ui_ink.ink_new'), icon='plus',
+variant='primary', size='sm', u_props='data-hook="new-ink-button"') if is_operator() else None)
+) }}
+
+{# Table #}
+{% call C.ui_card(hook_class='') %}
+{% call C.ui_table(headers=[
+{'label': t('ink.fields.date'), 'type': 'date'},
+{'label': t('ink.fields.type'), 'width': '120px'},
+{'label': t('ink.fields.color'), 'width': '120px'},
+{'label': t('ink.fields.qty'), 'type': 'number', 'width': '100px'},
+{'label': t('common.note'), 'cls': 'w-full'},
+{'label': t('common.actions'), 'type': 'action'}
+], rows=inks) %}
+{% for ink in inks %}
+{% call C.ui_tr() %}
+{# Date #}
+{% call C.ui_td(type='date', hook_class='') %}{{ C.ui_fmt_dt_min(ink.date) }}{% endcall %}
+{# Type #}
+{% call C.ui_td() %}{{ ink.type }}{% endcall %}
+{# Color #}
+{% call C.ui_td() %}{{ ink.color }}{% endcall %}
+{# Qty #}
+{% call C.ui_td(type='number', hook_class='') %}{{ ink.qty }}{% endcall %}
+{# Note #}
+{% call C.ui_td() %}{{ ink.note or '' }}{% endcall %}
+{# Actions #}
+{% call C.ui_td(type='action') %}
+{{ C.ui_row_actions(
+edit_href=url_for('ui_ink.ink_edit', id=ink.id),
+del_href=url_for('ui_ink.ink_delete', id=ink.id),
+is_operator=is_operator(),
+u_props_edit='data-hook="edit-ink-button"',
+u_props_del='data-hook="delete-ink-button"'
+) }}
+{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% endcall %}
+{{ C.ui_pagination(pagination, endpoint='ui_ink.ink_list') }}
+{% endcall %}
+{% endblock %}

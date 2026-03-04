@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% block page_width %}full{% endblock %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+
+{% block content %}
+{{ L.ui_page_header(title=t('fabric.list.title'), description=t('fabric.list.desc')) }}
+
+{% call L.ui_container(u_props='data-hook="fabric-list-root"') %}
+
+{# Toolbar (Strict Phase 6) #}
+{{ C.ui_list_toolbar(
+search_key='fabric',
+search_placeholder=t('common.search'),
+view_mode_key='fabric',
+current_view=view,
+secondary_actions=(F.ui_button(label=t('fabric.new.title'), href=url_for('ui_fabric.fabric_new'), icon='plus',
+variant='primary', size='sm') if is_operator() else None)
+) }}
+
+{% if fabrics %}
+
+{% if view == 'table' %}
+{# Table Panel #}
+{% call C.ui_card(hook_class='') %}
+{% call C.ui_table(headers=[
+{'label': t('fabric.fields.fabric_code'), 'type': 'code'},
+{'label': t('fabric.fields.material'), 'type': 'text'},
+{'label': t('fabric.fields.width'), 'type': 'measure'},
+{'label': t('fabric.fields.gram_per_yard'), 'type': 'measure'},
+{'label': t('common.remark'), 'type': 'text'},
+{'label': t('fabric.fields.length'), 'type': 'measure'},
+{'label': t('common.actions'), 'type': 'action'}
+], density='compact', width_mode='content') %}
+{% for fabric in fabrics %}
+{% call C.ui_tr() %}
+{# Fabric Code #}
+{{ C.ui_td(text=fabric.fabric_code, bold=True, type='code') }}
+{# Material #}
+{{ C.ui_td(text=t('fabric.material.' + fabric.material) if fabric.material in ['poly', 'nylon', 'other'] else
+(fabric.material or t('common.none')), type='text') }}
+{# Width #}
+{{ C.ui_td(text=C.ui_measure("%.1f"|format(fabric.width_mm / 10)|replace('.0', ''), t('common.unit.cm')) if
+fabric.width_mm else '-', type='measure', hook_class='') }}
+{# Gram per Yard #}
+{{ C.ui_td(text=C.ui_measure("%.1f"|format(fabric.yard_weight_gyd), 'g/yd') if
+fabric.yard_weight_gyd else '-', type='measure', hook_class='') }}
+{# Remark #}
+{{ C.ui_td(text=fabric.remark or '', type='text', hook_class='',
+u_props='title="' ~ (fabric.remark or '') ~ '"') }}
+{# Total Inventory (Length) #}
+{% set inventory_text = (fabric.in_stock_cylinders ~ ' ' ~ t('fabric.cylinder') ~ ' · ' ~ fabric.in_stock_rolls ~ ' ' ~
+t('fabric.rolls')) %}
+{% call C.ui_td(type='measure', hook_class='') %}
+{{ C.ui_value_meta(C.ui_fmt_length_m(fabric.total_inventory), inventory_text) }}
+{% endcall %}
+{# Actions #}
+{% set view_fabric = A.ui_action_link(label=None, href=url_for('ui_fabric.fabric_explorer', fabric_id=fabric.id),
+icon='eye', tone='neutral', u_props='title="' ~ t('common.view') ~ '" aria-label="' ~ t('common.view') ~ '"') %}
+
+{% set edit_fabric = A.ui_action_link(label=None, href=url_for('ui_fabric.fabric_edit', id=fabric.id), icon='pencil',
+tone='neutral', u_props='title="' ~ t('common.edit') ~ '" aria-label="' ~ t('common.edit') ~ '"') if is_operator() else
+None %}
+
+{% set stock_in = A.ui_action_link(label=None, href=url_for('ui_fabric.stock_in_form', fabric_id=fabric.id),
+icon='box-seam', tone='neutral', u_props='title="' ~ t('fabric.action.stock_in') ~ '" aria-label="' ~
+t('fabric.action.stock_in') ~ '"') if is_operator() else None %}
+
+{% call C.ui_td(type='action', hook_class='') %}
+{{ C.ui_row_actions_fixed(slot1=view_fabric, slot2=edit_fabric, slot3=stock_in) }}
+{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% endcall %}
+{% endif %}
+
+{% if view == 'grid' %}
+{# Cards Panel (Grid View) #}
+{% call L.ui_box(u_props='data-hook="fabric-cards-panel"') %}
+{# Strict Grid Density: 1 -> 2 -> 3 -> 4 #}
+{% call L.ui_grid(cols=3, gap=6, hook_class='sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4') %}
+{% for fabric in fabrics %}
+{% call C.ui_card() %}
+{% call L.ui_stack(direction='col', spacing=3) %}
+{# Fabric Code Header #}
+{% call L.ui_stack(direction='row', spacing=2, align='center', justify='between') %}
+{{ C.ui_text(text=fabric.fabric_code, variant='h3', bold=True) }}
+{% if is_operator() %}
+{{ A.ui_action_link(label=t('common.edit'), href=url_for('ui_fabric.fabric_edit', id=fabric.id), icon='pencil',
+size='xs', tone='ghost') }}
+{% endif %}
+{% endcall %}
+
+{# Summary Info #}
+{% call L.ui_stack(direction='col', spacing=2) %}
+{% if fabric.material %}
+{{ C.ui_text(text=t('fabric.fields.material') ~ ': ' ~ (t('fabric.material.' + fabric.material) if fabric.material in
+['poly', 'nylon', 'other'] else fabric.material), variant='small', tone='subtle') }}
+{% endif %}
+{% if fabric.width_mm %}
+{{ C.ui_text(text=t('fabric.fields.width') ~ ': ' ~ ((fabric.width_mm / 10)|round(1)|string|replace('.0', '') ~ ' ' ~
+t('common.unit.cm')), variant='small',
+tone='subtle') }}
+{% endif %}
+{% if fabric.yard_weight_gyd %}
+{{ C.ui_text(text=t('fabric.fields.gram_per_yard') ~ ': ' ~ ("%.1f"|format(fabric.yard_weight_gyd)) ~ ' g/yd',
+variant='small',
+tone='subtle') }}
+{% endif %}
+{# Remark (summary, muted ellipsis) #}
+{% if fabric.remark %}
+{{ C.ui_text(text=fabric.remark, variant='small', tone='subtle',
+hook_class='ui-remark-ellipsis',
+u_props='title="' ~ fabric.remark ~ '"') }}
+{% endif %}
+{# Inventory Stats #}
+{% call L.ui_stack(direction='col', spacing=1) %}
+{% if fabric.total_inventory %}
+{% call C.ui_text(variant='small', bold=True) %}
+{{ t('fabric.stats.total_inventory') }}: {{ C.ui_fmt_length_m(fabric.total_inventory) }}
+{% endcall %}
+{% endif %}
+{{ C.ui_text(text=t('common.in_stock') ~ ': ' ~ fabric.in_stock_cylinders ~ ' ' ~ t('fabric.cylinder') ~ ' · ' ~
+fabric.in_stock_rolls ~ ' ' ~ t('fabric.rolls'), variant='small', tone='subtle') }}
+{% endcall %}
+{% endcall %}
+
+{# Actions #}
+{% call L.ui_stack(direction='row', spacing=2, hook_class='') %}
+{{ A.ui_action_link(label=t('common.view'), href=url_for('ui_fabric.fabric_explorer', fabric_id=fabric.id),
+icon='eye', tone='primary', size='sm') }}
+{{ A.ui_action_link(label=t('fabric.action.stock_in'), href=url_for('ui_fabric.stock_in_form', fabric_id=fabric.id),
+icon='box-seam', tone='neutral', size='sm') }}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% endcall %}
+{% endif %}
+
+{% else %}
+{{ C.ui_empty_state(title=t('fabric.empty.title'), description=t('fabric.empty.description'), icon='grid-3x3-gap') }}
+{% endif %}
+
+{{ C.ui_pagination(pagination, endpoint='ui_fabric.fabric_list') }}
+{% endcall %}
+{% endblock %}

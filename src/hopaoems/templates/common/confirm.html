@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+
+{% block content %}
+{% call L.ui_center_box(size='md') %}
+{% call C.ui_card(title=title or t('common.confirm_action')) %}
+{{ C.ui_text(text=message or t('common.confirm_message'), tone='subtle', variant='preline') }}
+
+{% call L.ui_stack(spacing=4) %}
+{% call F.ui_form(action=action_url, method='POST') %}
+{% if hidden_fields %}
+{% for name, value in hidden_fields.items() %}
+{% if value is iterable and value is not string %}
+{% for v in value %}
+<input type="hidden" name="{{ name }}" value="{{ v }}">
+{% endfor %}
+{% else %}
+<input type="hidden" name="{{ name }}" value="{{ value }}">
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% call L.ui_form_footer() %}
+{{ F.ui_button(label=t('common.cancel'), href=cancel_url or back_url or url_for('ui.index'), variant='secondary',
+icon='arrow-left') }}
+{{ F.ui_button(label=confirm_label or action_label or t('common.confirm'), type='submit', variant=confirm_variant or
+variant or 'primary', icon='check-lg')
+}}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endblock %}

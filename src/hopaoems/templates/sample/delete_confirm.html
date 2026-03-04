@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{{ L.ui_page_header(title=t('sample.confirm.delete_title')) }}
+
+{% call L.ui_container() %}
+{% call C.ui_card(title=t('common.confirm_action')) %}
+{% call L.ui_stack(direction='col', spacing=4) %}
+
+{% call C.ui_alert(tone='danger') %}
+{% call L.ui_stack(spacing=1) %}
+{{ C.ui_text(text='Warning', variant='h3', tone='danger') }}
+{{ C.ui_text(text=t('sample.confirm.delete_message', sample_no=sample.sample_no)) }}
+{% endcall %}
+{% endcall %}
+
+{% call F.ui_form(method='POST') %}
+{% call L.ui_stack(direction='row', spacing=3) %}
+{{ F.ui_button(label=t('common.confirm'), variant='danger', type='submit') }}
+{{ F.ui_button(label=t('common.cancel'), variant='secondary', href=url_for('ui_sample.sample_view', id=sample.id)) }}
+{% endcall %}
+{% endcall %}
+
+{% endcall %}
+{% endcall %}
+{% endcall %}
+
+{% endblock %}

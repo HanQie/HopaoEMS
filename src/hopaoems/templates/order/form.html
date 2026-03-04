@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+
+{% block content %}
+{% set header_actions %}
+{{ F.ui_button(label=t('common.back'), variant='secondary', href=url_for('ui_order.order_view', id=order.id) if order
+else url_for('ui_order.order_list'), icon='arrow-left') }}
+{% endset %}
+
+{{ L.ui_page_header(
+title=t('order.edit.title') if order else t('order.new.title'),
+actions=header_actions
+) }}
+
+{% call L.ui_container(u_props='data-hook="order-form-root"') %}
+{% call F.ui_form(method='POST', spacing=8) %}
+
+{# 1. Order Information #}
+{% call C.ui_card(title=t('order.info')) %}
+{% call L.ui_grid(cols=3, gap=6) %}
+{{ F.ui_input(name='order_no', label=t('order.fields.order_no'), value=order.order_no if order else '', required=True)
+}}
+{{ F.ui_input(name='received_date', label=t('order.fields.received_date'), type='date', value=order.received_date if
+order else '', required=True) }}
+{{ F.ui_input(name='due_date', label=t('order.fields.due_date'), type='date', value=order.due_date if order else '') }}
+{% endcall %}
+{% call L.ui_box(hook_class='') %}
+{{ F.ui_textarea(name='note', label=t('common.note'), value=order.note if order else '') }}
+{% endcall %}
+{% endcall %}
+
+{# 2. Order Items #}
+{% set items_actions %}
+{{ F.ui_button(label=t('order.actions.add_item'), icon='plus', type='button', variant='secondary', size='sm',
+u_props='data-action="add-item"') }}
+{% endset %}
+{% call C.ui_card(title=t('order.form.items'), actions=items_actions) %}
+{% call L.ui_stack(direction='col', spacing=4, u_props='id="items-container" data-hook="items-container"') %}
+{% set loop_items = order.order_items if (order and order.order_items) else [{}] %}
+{% for item in loop_items %}
+{% set loop_index = loop.index0 %}
+{% call C.ui_panel(tone='neutral', border=True, u_props='data-hook="order-item-row"') %}
+{% call L.ui_stack(direction='row', spacing=4, align='end') %}
+<input type="hidden" name="items[{{ loop_index }}][id]" value="{{ item.id|default('') }}" data-hook="js-item-id">
+{% call L.ui_box(flex=1) %}
+{{ F.ui_select(name='items[' ~ loop_index ~ '][fabric_no]', label=t('fabric.fields.code'), required=True,
+options=fabric_options, value=item.fabric_no|default(''), u_props='data-hook="order-item-fabric-select"')
+}}
+{% endcall %}
+{% call L.ui_box(flex=1) %}
+{{ F.ui_select(name='items[' ~ loop_index ~ '][sample_id]', label=t('sample.fields.title'), required=True,
+options=sample_options, value=item.sample_id|default(''), u_props='data-hook="order-item-sample-select"') }}
+{% endcall %}
+{% call L.ui_box(w=24) %}
+{{ F.ui_input(name='items[' ~ loop_index ~ '][qty]', label=t('order.fields.qty'), type='number', u_props='step="0.1"
+data-hook="order-item-qty"',
+required=True, value=item.qty|default('')) }}
+{% endcall %}
+{% call L.ui_box(flex=2) %}
+{{ F.ui_input(name='items[' ~ loop_index ~ '][note]', label=t('common.note'), value=item.note|default('')) }}
+{% endcall %}
+{% call L.ui_box() %}
+{{ F.ui_button(icon='trash', variant='ghost', u_props='data-action="remove-item"', type='button') }}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% endcall %}
+
+{# Footer #}
+{% call L.ui_form_footer() %}
+{{ F.ui_button(label=t('common.cancel'), variant='secondary', href=url_for('ui_order.order_view', id=order.id) if order
+else
+url_for('ui_order.order_list'), icon='arrow-left') }}
+{{ F.ui_button(label=t('common.submit'), type='submit', variant='primary', icon='check-lg') }}
+{% endcall %}
+
+
+<template id="item-template" data-hook="item-template">
+    {% call C.ui_panel(tone='neutral', border=True, u_props='data-hook="order-item-row"') %}
+    {% call L.ui_stack(direction='row', spacing=4, align='end') %}
+    <input type="hidden" name="items[INDEX][id]" data-hook="js-item-id">
+    {% call L.ui_box(flex=1) %}
+    {{ F.ui_select(name='items[INDEX][fabric_no]', label=t('fabric.fields.code'), required=True, options=fabric_options,
+    u_props='data-hook="order-item-fabric-select"')
+    }}
+    {% endcall %}
+    {% call L.ui_box(flex=1) %}
+    {{ F.ui_select(name='items[INDEX][sample_id]', label=t('sample.fields.title'), required=True,
+    options=sample_options, u_props='data-hook="order-item-sample-select"') }}
+    {% endcall %}
+    {% call L.ui_box(w=24) %}
+    {{ F.ui_input(name='items[INDEX][qty]', label=t('order.fields.qty'), type='number', u_props='step="0.1"
+    data-hook="order-item-qty"',
+    required=True) }}
+    {% endcall %}
+    {% call L.ui_box(flex=2) %}
+    {{ F.ui_input(name='items[INDEX][note]', label=t('common.note')) }}
+    {% endcall %}
+    {% call L.ui_box() %}
+    {{ F.ui_button(icon='trash', variant='ghost', u_props='data-action="remove-item"', type='button') }}
+    {% endcall %}
+    {% endcall %}
+    {% endcall %}
+</template>
+{% endcall %}
+{% endcall %}
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+
+{% block content %}
+{% set header_actions %}
+{{ F.ui_button(label=t('common.back'), variant='secondary',
+href=url_for('ui_production.production_task_view', id=task.id), icon='arrow-left') }}
+{% endset %}
+
+{{ L.ui_page_header(
+title=t('production.produce.title'),
+description=t('production.form.subtitle'),
+actions=header_actions
+) }}
+
+{% call L.ui_container() %}
+
+{# ── A. Summary Row (2 columns) ── #}
+{% call L.ui_grid(cols=2) %}
+
+{# Left: Task Info Card #}
+{% call C.ui_card(title=t('production.task.info')) %}
+{% call L.ui_stack(direction='row', spacing=4, align='center') %}
+{{ C.ui_sample_thumb(preview_path=task.preview_path, size='lg') }}
+{% call L.ui_stack(spacing=1) %}
+{{ C.ui_text(text=task.sample_title, variant='h3') }}
+{{ C.ui_text(text='#' ~ task.sample_id, variant='small', tone='subtle') }}
+{% endcall %}
+{% endcall %}
+
+{% call L.ui_box(hook_class='') %}
+{% call L.ui_grid(cols=1, gap=3) %}
+{% call L.ui_stack(direction='row', spacing=2, align='center') %}
+{{ C.ui_text(text=t('order.fields.order_no') ~ ':', tone='subtle', variant='small') }}
+{{ C.ui_text(text=task.order_no, variant='small') }}
+{% endcall %}
+{% call L.ui_stack(direction='row', spacing=2, align='center') %}
+{{ C.ui_text(text=t('common.status') ~ ':', tone='subtle', variant='small') }}
+{{ C.ui_status_badge('task', task.status) }}
+{% endcall %}
+{% call L.ui_stack(direction='row', spacing=2, align='center') %}
+{{ C.ui_text(text=t('fabric.fields.code') ~ ':', tone='subtle', variant='small') }}
+{{ C.ui_text(text=task.fabric_no, variant='small', bold=True) }}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+
+{# Right: Progress Card #}
+{% call C.ui_card(title=t('production.progress.title')) %}
+{% call L.ui_stack(direction='col', spacing=4) %}
+{# Progress Bar #}
+{{ C.ui_progress_bar(task.progress_pct,
+aria_label_key=t('production.progress.aria_label'),
+tone='success' if task.progress_pct >= 100 else 'primary',
+printed_m=task.printed_length_m,
+target_m=task.target_length_m) }}
+
+{# KPI Grid: Washed / To Wash / Pending Count #}
+{% set stats = [
+{'label': t('production.progress.washed'), 'value': C.ui_fmt_length_m(task.washed or 0), 'tone': 'success'},
+{'label': t('production.progress.to_wash'), 'value': C.ui_fmt_length_m(task.to_wash or 0), 'tone': 'info'},
+{'label': t('order.list.col.unwashed'), 'value': task.pending_wash_count or 0, 'hint': t('common.logs')}
+] %}
+{% call L.ui_box(hook_class='') %}
+{{ C.ui_stat_grid(items=stats, cols=3) }}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+
+{% endcall %}{# /ui_grid #}
+
+{# ── B. Main Form Card ── #}
+{% call C.ui_card(title=t('production.produce.title'), hook_class='') %}
+
+{# 2. Roll Search (GET) #}
+{% call F.ui_form(method='GET', action=url_for('ui_production.production_task_produce', id=task.id),
+spacing=4, hook_class='') %}
+{% call L.ui_stack(direction='row', align='end', spacing=2) %}
+{{ F.ui_input(name='roll_q',
+label=t('production.quick_produce.roll_picker.search_placeholder'),
+value=roll_q,
+placeholder=t('common.search_placeholder'),
+hook_class='') }}
+{{ F.ui_button(label=t('common.search'), type='submit', variant='secondary', icon='search') }}
+{% endcall %}
+{% endcall %}
+
+{# 3. Production Form (POST) #}
+{% call F.ui_form(method='POST', action=url_for('ui_production.production_task_produce', id=task.id), spacing=6) %}
+
+{{ F.ui_select(name='roll_id',
+label=t('production.produce.fields.roll'),
+options=roll_options,
+required=True,
+help_text=t('production.quick_produce.roll_picker.empty_hint') if not roll_options else None) }}
+
+{{ F.ui_input(name='printed_length',
+label=t('production.produce.fields.printed_length'),
+type='number',
+u_props='step="0.01"',
+required=True) }}
+
+{{ F.ui_input(name='note',
+label=t('production.produce.fields.note'),
+required=False) }}
+
+{{ F.ui_checkbox(name='roll_depleted',
+label=t('production.produce.fields.roll_depleted'),
+value='1') }}
+
+{% call L.ui_form_footer() %}
+{{ F.ui_button(label=t('production.action.produce'),
+type='submit', variant='primary', icon='check-lg') }}
+{% endcall %}
+
+{% endcall %}
+
+{% endcall %}{# /ui_card #}
+
+{% endcall %}{# /ui_container #}
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+
+{% block content %}
+{{ L.ui_page_header(
+    title=t('settings.activity.title'),
+    actions=F.ui_button(label=t('common.back'), variant='secondary', href=url_for('ui_settings.settings_list'), icon='arrow-left')
+) }}
+
+{% call L.ui_container() %}
+
+{# 1. Summary Statistics #}
+{{ C.ui_stat_grid(items=[
+    {'label': t('common.records'), 'value': activities|length, 'tone': 'info'},
+    {'label': t('wash.history.last_activity'), 'value': C.ui_fmt_dt_min(activities[0].timestamp) if activities else '-', 'tone': 'neutral'}
+], cols=2) }}
+
+{# 2. Activity Table #}
+{% call C.ui_card(title=t('settings.activity.log')) %}
+{% call C.ui_table(headers=[
+    t('common.time'),
+    t('common.operator'),
+    t('common.action'),
+    t('common.id'),
+    t('common.remark')
+], density='compact') %}
+{% for act in activities %}
+{% call C.ui_tr() %}
+    {% call C.ui_td() %}{{ C.ui_fmt_dt_min(act.timestamp) }}{% endcall %}
+    {% call C.ui_td() %}{{ act.operator_name or t('common.unknown') }}{% endcall %}
+    {% call C.ui_td() %}
+        {% set tone = 'danger' if act.action == 'DELETE' else 'warning' if act.action == 'REVOKE' else 'info' %}
+        {{ C.ui_badge(label=act.action, tone=tone) }}
+        {{ C.ui_text(text=act.target_entity, variant='small', tone='subtle', hook_class='') }}
+    {% endcall %}
+    {% call C.ui_td() %}#{{ act.target_id }}{% endcall %}
+    {% call C.ui_td(hook_class='truncate') %}{{ act.details or '-' }}{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% endcall %}
+
+{% endcall %}
+{% endblock %}

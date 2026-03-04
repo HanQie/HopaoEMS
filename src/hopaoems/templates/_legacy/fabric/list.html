@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{{ L.ui_page_header(
+title=t('fabric.list.title'),
+actions=L.ui_stack(spacing=2, items=[
+F.ui_button(label=t('fabric.explorer.title'), href=url_for('ui_fabric.fabric_explorer'), variant='secondary',
+icon='search'),
+F.ui_button(label=t('fabric.list.create_new'), href=url_for('ui_fabric.fabric_new'), icon='plus')
+]) if is_operator() else F.ui_button(label=t('fabric.explorer.title'),
+href=url_for('ui_fabric.fabric_explorer'), variant='secondary', icon='search')
+) }}
+
+{% call L.ui_container() %}
+{% call C.ui_card(hook_class='') %}
+{% call C.ui_table(headers=[t('fabric.fields.code'), t('fabric.fields.material'), t('common.actions')], rows=fabrics) %}
+{% for fabric in fabrics %}
+<tr>
+    {% call C.ui_td() %}
+    {{ A.ui_action_link(label=fabric.fabric_code, href=url_for('ui_fabric.fabric_view', id=fabric.id), tone='primary')
+    }}
+    {% endcall %}
+    {% call C.ui_td() %}{{ fabric.material or '-' }}{% endcall %}
+    {% call C.ui_td() %}
+    {{ A.ui_action_link(label=t('common.view'), href=url_for('ui_fabric.fabric_view', id=fabric.id), icon='eye') }}
+    {% endcall %}
+</tr>
+{% endfor %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endblock %}

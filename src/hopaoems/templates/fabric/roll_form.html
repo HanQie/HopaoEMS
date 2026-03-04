@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+
+{% block content %}
+{% set header_actions %}
+{{ F.ui_button(label=t('common.back'), variant='secondary', href=url_for('ui_fabric.fabric_explorer',
+fabric_id=roll.fabric_id if roll else ''), icon='arrow-left') }}
+{% endset %}
+
+{{ L.ui_page_header(
+title=t('roll.edit.title') if roll else t('roll.new.title'),
+actions=header_actions
+) }}
+
+{% call L.ui_container() %}
+{% call L.ui_box(w='1/2') %}
+{% call C.ui_card() %}
+{% call F.ui_form(method='POST') %}
+{{ F.ui_input(name='roll_no', label=t('fabric.fields.roll_no'), required=True, value=roll.roll_no if roll else '') }}
+{{ F.ui_textarea(name='remark', label=t('common.remark'), value=roll.remark if roll else '') }}
+
+{% call L.ui_form_footer() %}
+{{ F.ui_button(label=t('common.cancel'), variant='secondary', href=url_for('ui_fabric.fabric_explorer',
+fabric_id=roll.fabric_id if roll else ''), icon='arrow-left') }}
+{{ F.ui_button(label=t('common.submit'), variant='primary', type='submit', icon='check-lg') }}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endblock %}

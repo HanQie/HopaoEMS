@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+
+{% block content %}
+{{ L.ui_page_header(title=t('dashboard.title')) }}
+
+{% call L.ui_container() %}
+{# A) KPI 區（薄、清楚）#}
+{{ C.ui_stat_grid(items=[
+{'label': t('dashboard.stats.open_orders'), 'value': stats.open_orders_count if stats.open_orders_count is not none else
+0, 'tone': 'info', 'href': stats.links.open_orders},
+{'label': t('dashboard.stats.printing_tasks'), 'value': stats.printing_tasks_count if stats.printing_tasks_count is not
+none else 0, 'tone': 'success', 'href': stats.links.printing_tasks},
+{'label': t('dashboard.stats.inventory_total'), 'value': C.ui_fmt_length_m(stats.inventory_total_length_m), 'tone':
+'neutral', 'href': stats.links.inventory},
+{'label': t('dashboard.stats.unwashed_logs'), 'value': stats.unwashed_logs_count if stats.unwashed_logs_count is not
+none else 0, 'tone': 'warning', 'href': stats.links.unwashed_logs}
+], cols=4) }}
+
+{# B) Recent / Activity 主表（compact + 對帳友善）#}
+{% call C.ui_card(title=t('dashboard.recent_logs.title'), hook_class='') %}
+{% call C.ui_table(headers=[
+t('dashboard.recent_logs.columns.sample'),
+t('dashboard.recent_logs.columns.order_no'),
+t('dashboard.recent_logs.columns.fabric'),
+t('dashboard.recent_logs.columns.vat'),
+t('dashboard.recent_logs.columns.roll'),
+t('common.length'),
+t('dashboard.recent_logs.columns.created_at'),
+t('common.status'),
+t('common.actions')
+], empty_message=t('dashboard.recent_logs.empty'), density='compact') %}
+{% for log in stats.recent_logs %}
+{% call C.ui_tr() %}
+{% call C.ui_td() %}
+{{ C.ui_sample_thumb(preview_path=log.preview_path, size='sm') }}
+{% endcall %}
+{% call C.ui_td() %}{{ log.order_no if log.order_no else t('common.none') }}{% endcall %}
+{% call C.ui_td() %}{{ log.fabric_no if log.fabric_no else t('common.none') }}{% endcall %}
+{% call C.ui_td() %}{{ log.cylinder_no if log.cylinder_no else t('common.none') }}{% endcall %}
+{% call C.ui_td() %}{{ log.roll_no if log.roll_no else t('common.none') }}{% endcall %}
+{% call C.ui_td() %}{{ C.ui_fmt_length_m(log.length) }}{% endcall %}
+{% call C.ui_td() %}{{ C.ui_fmt_dt_min(log.created_at) }}{% endcall %}
+{% call C.ui_td() %}{{ C.ui_status_badge(kind='wash', value='washed' if log.washed_at else 'unwashed') }}{% endcall %}
+{% call C.ui_td(align='right') %}
+{{ C.ui_row_actions(
+view_href=url_for('ui_production.production_task_view', id=log.task_id) if log.task_id else None,
+is_operator=False
+) }}
+{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endblock %}

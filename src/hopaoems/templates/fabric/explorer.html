@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+
+{% block content %}
+{# Header Actions: Edit + Stock In + Back #}
+{% set header_actions %}
+{{ F.ui_button(label=t('common.back_to_list'), href=url_for('ui_fabric.fabric_list'), icon='arrow-left',
+variant='secondary') }}
+{% endset %}
+
+{{ L.ui_page_header(
+title=fabric.fabric_code,
+description=t('fabric.roll.title'),
+actions=header_actions
+) }}
+
+{% call L.ui_container(u_props='data-hook="fabric-detail-root"') %}
+{% call L.ui_stack(direction='col', spacing=6) %}
+
+{# 1. Fabric Summary Stats #}
+{{ C.ui_stat_grid(items=[
+{'label': t('fabric.fields.material'), 'value': (t('fabric.material.' + fabric.material) if fabric.material in
+['poly', 'nylon', 'other'] else (fabric.material or t('common.none'))), 'tone': 'neutral'},
+{'label': t('fabric.fields.width'), 'value': ((fabric.width_mm / 10)|round(1)|string|replace('.0', '') ~ ' ' ~
+t('common.unit.cm')) if fabric.width_mm else '-',
+'tone': 'neutral'},
+{'label': t('fabric.stats.total_inventory'), 'value': C.ui_fmt_length_m(stats.total_inventory), 'tone':
+'neutral'},
+{'label': t('fabric.stats.roll_count'), 'value': stats.roll_count, 'tone': 'neutral'}
+], cols=4) }}
+
+{# SEARCH AREA WITH BOTTOM LINE #}
+{% call L.ui_box(hook_class='block') %}
+{% set hidden_inputs %}
+<input type="hidden" name="fabric_id" value="{{ fabric.id }}">
+{% endset %}
+
+{% set toolbar_actions %}
+{% if is_operator() %}
+{% call L.ui_stack(direction='row', spacing=2) %}
+{{ F.ui_button(label=t('common.edit'), href=url_for('ui_fabric.fabric_edit', id=fabric.id), icon='pencil', size='sm',
+variant='secondary') }}
+{% endcall %}
+{% endif %}
+{% endset %}
+
+{% call C.ui_list_toolbar(
+search_key='fabric-explorer',
+search_placeholder=t('common.search'),
+search_hidden_inputs=hidden_inputs,
+secondary_actions=toolbar_actions
+) %}
+{% if q %}
+{{ A.ui_action_link(href=url_for('ui_fabric.fabric_explorer', fabric_id=fabric.id), icon='x-lg', tone='neutral',
+size='sm', u_props='title="' ~ t('common.reset') ~ '"') }}
+{% endif %}
+{% endcall %}
+{% endcall %}
+
+{# 2. Cylinder Groups #}
+{% if cylinder_groups %}
+{% for group in cylinder_groups %}
+{% set cylinder = group.cylinder %}
+{% set rolls = group.rolls %}
+{% set cyl_stats = group.stats %}
+
+{% set cyl_actions %}
+{% if is_operator() %}
+{{ F.ui_button(label=t('fabric.action.stock_in'), href=url_for('ui_fabric.stock_in_form', cylinder_id=cylinder.id),
+icon='box-seam', size='sm', variant='secondary') }}
+{% endif %}
+{% endset %}
+
+<div id="cylinder-{{ cylinder.id }}">
+    {% call C.ui_card(title=t('fabric.fields.cylinder') ~ ': ' ~ cylinder.cylinder_no, actions=cyl_actions) %}
+
+    {# Rolls Table #}
+    {% if rolls %}
+    {% call C.ui_table(headers=[
+    t('fabric.fields.roll_no'),
+    {'label': t('fabric.fields.length_m'), 'type': 'number'},
+    t('common.status'),
+    {'label': t('common.remark'), 'type': 'text'},
+    {'label': t('common.actions'), 'type': 'action'}
+    ], density='compact') %}
+    {% for r in rolls %}
+    {% call C.ui_tr() %}
+    {# Roll No #}
+    {{ C.ui_td(text=r.roll_no, bold=True) }}
+    {# Length #}
+    {% call C.ui_td(type='number', hook_class='') %}{{ C.ui_fmt_length_m(r.length_m) }}{% endcall %}
+    {# Status #}
+    {% call C.ui_td() %}
+    {{ C.ui_status_badge(kind='roll', value=r.status) }}
+    {% endcall %}
+    {# Remark #}
+    {{ C.ui_td(text=r.remark or '', type='text', hook_class='',
+    u_props='title="' ~ (r.remark or '') ~ '"') }}
+
+    {# Actions #}
+    {% call C.ui_td(type='action') %}
+    {% set r_adjust = A.ui_action_link(href=url_for('ui_fabric.roll_adjust_stock', id=r.id), icon='pencil',
+    tone='neutral',
+    u_props='data-hook="adjust-stock-button" title="' ~ t('fabric.actions.adjust') ~ '" aria-label="' ~
+    t('fabric.actions.adjust') ~ '"') if is_operator()
+    and r.status == 'in_stock' else None %}
+    {% set r_history = A.ui_action_link(href=url_for('ui_fabric.roll_history', id=r.id), icon='clock', tone='neutral',
+    u_props='title="' ~ t('fabric.roll.history') ~ '" aria-label="' ~ t('fabric.roll.history') ~ '"') %}
+    {% set r_delete = A.ui_action_link(href=url_for('ui_fabric.roll_delete', id=r.id), icon='trash', tone='danger',
+    u_props='title="' ~ t('common.delete') ~ '" aria-label="' ~ t('common.delete') ~ '"') if is_operator() and
+    r.can_delete
+    else None %}
+
+    {{ C.ui_row_actions_fixed(slot1=r_adjust, slot2=r_history, slot3=r_delete) }}
+    {% endcall %}
+    {% endcall %}
+    {% endfor %}
+    {% endcall %}
+    {% else %}
+    {{ C.ui_empty_state(title=t('fabric.no_rolls'), description=t('fabric.list.stock_in_hint')) }}
+    {% endif %}
+    {% endcall %}
+</div>
+{% endfor %}
+{% else %}
+{% call C.ui_card(title=t('fabric.no_cylinders')) %}
+{{ C.ui_empty_state(title=t('fabric.no_cylinders'), description=t('fabric.list.stock_in_hint')) }}
+{% endcall %}
+{% endif %}
+
+{% endcall %}
+{% endcall %}
+{% endblock %}

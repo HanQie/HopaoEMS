@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+
+{% block content %}
+{{ L.ui_page_header(
+title=t('wash.history.title'),
+actions=F.ui_button(label=t('common.back'), variant='secondary', href=url_for('ui_wash.wash_list'), icon='arrow-left')
+) }}
+
+{% call L.ui_container() %}
+{% call C.ui_list_toolbar(
+search_key='wash-history',
+search_placeholder=t('wash.history.search.placeholder')
+) %}
+{% if q %}
+{{ A.ui_action_link(label=t('common.clear'), href=url_for('ui_wash.wash_history'), icon='x', tone='neutral') }}
+{% endif %}
+{% endcall %}
+
+{% if sessions %}
+{# A) Top Summary #}
+{% set total_len = sessions|sum(attribute='total_length') %}
+{{ C.ui_stat_grid(items=[
+{'label': t('order.dossier.sessions'), 'value': sessions|length, 'tone': 'neutral'},
+{'label': t('wash.group.total_length'), 'value': total_len|round(2)|string ~ ' ' ~ t('common.unit.m'), 'tone':
+'neutral'},
+{'label': t('wash.history.last_activity'), 'value': C.ui_fmt_dt_min(sessions[0].created_at), 'tone': 'neutral'}
+], cols=3) }}
+
+{# B) Sessions Table (Compact) #}
+{% call C.ui_card(title=t('wash.history')) %}
+{% call C.ui_table(headers=[
+{'label': t('wash.fields.washed_at'), 'type': 'date'},
+t('wash.group.vat'),
+{'label': t('wash.summary.logs'), 'type': 'number'},
+{'label': t('wash.group.rolls_count'), 'type': 'number'},
+{'label': t('wash.group.total_length'), 'type': 'number'},
+{'label': t('common.actions'), 'type': 'action'}
+], density='compact') %}
+{% for s in sessions %}
+{% call C.ui_tr() %}
+{# Washed At #}
+{% call C.ui_td(type='date', hook_class='') %}{{ C.ui_fmt_dt_min(s.created_at) }}{% endcall %}
+
+{# Vat #}
+{% call C.ui_td() %}
+{{ C.ui_vat_group_header(vat_code=s.vat_code, tone_idx=s.tone_idx) }}
+{% endcall %}
+
+{# Logs Count #}
+{% call C.ui_td(type='number', hook_class='') %}{{ s.logs|length }}{% endcall %}
+
+{# Rolls Count #}
+{% call C.ui_td(type='number', hook_class='') %}{{ s.roll_count }}{% endcall %}
+
+{# Total Length #}
+{% call C.ui_td(type='number', hook_class='') %}{{ C.ui_fmt_length_m(s.total_length) }}{% endcall %}
+
+{# Actions #}
+{% call C.ui_td(type='action') %}
+{% set toggle_link = A.ui_action_link(label=None, href='#', icon='chevron-down', tone='neutral',
+u_props='data-action="wash-history-toggle" data-target="wash-detail-' ~ s.id ~ '" title="' ~ t('wash.history.detail') ~
+'" aria-label="' ~ t('wash.history.detail') ~ '"') %}
+
+{% set revoke_link = A.ui_action_link(label=None, href=url_for('ui_wash.wash_revoke', session_id=s.id), tone='danger',
+icon='x-circle', u_props='title="' ~ t('wash.action.revoke') ~ '" aria-label="' ~ t('wash.action.revoke') ~ '"') if
+is_operator() else None %}
+
+{{ C.ui_row_actions_fixed(slot1=toggle_link, slot2=revoke_link) }}
+{% endcall %}
+{% endcall %}
+{# Detail accordion row #}
+{% call C.ui_tr(u_props='id="wash-detail-' ~ s.id ~ '" hidden') %}
+{% call C.ui_td(u_props='colspan="6"') %}
+{% call L.ui_box(hook_class='') %}
+{{ C.ui_divider(hook_class='') }}
+{% call C.ui_table(headers=[
+t('wash.history.detail.roll_no'),
+{'label': t('wash.history.detail.length'), 'type': 'number'},
+t('wash.history.detail.cylinder'),
+t('wash.history.detail.task_id'),
+t('wash.history.detail.sample_title')
+], density='compact') %}
+{% for log in s.logs %}
+{% call C.ui_tr() %}
+{% call C.ui_td() %}{{ log.roll_no or t('common.none') }}{% endcall %}
+{% call C.ui_td(type='number', hook_class='') %}{{ C.ui_fmt_length_m(log.length) }}{% endcall %}
+{% call C.ui_td() %}{{ s.vat_code or t('common.none') }}{% endcall %}
+{% call C.ui_td() %}{{ '#' ~ log.task_id if log.task_id else t('common.none') }}{% endcall %}
+{% call C.ui_td() %}{{ log.sample_title or t('common.none') }}{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% endcall %}
+
+{% else %}
+{# D) Empty State #}
+{% if q %}
+{{ C.ui_empty_state(title=t('wash.history.empty.no_results'), description=t('wash.history.empty.try_other_query'),
+icon='search') }}
+{% else %}
+{{ C.ui_empty_state(title=t('wash.history.empty.no_sessions'), description=t('wash.hint.history_scoped'), icon='inbox')
+}}
+{% endif %}
+{% endif %}
+
+{{ C.ui_pagination(pagination, endpoint='ui_wash.wash_history') }}
+{% endcall %}
+{% endblock %}

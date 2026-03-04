@@ -1,0 +1,507 @@
+{
+  "version": 1,
+  "routes": [
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/",
+      "endpoint": "ui.index"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/i18n/set/<lang>",
+      "endpoint": "ui.set_lang"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/data/uploads/samples/<path:filename>",
+      "endpoint": "ui.sample_image"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/auth/login",
+      "endpoint": "auth.login"
+    },
+    {
+      "methods": [
+        "POST"
+      ],
+      "rule": "/auth/logout",
+      "endpoint": "auth.logout"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/fabric/roll/<int:id>/adjust-stock",
+      "endpoint": "ui_fabric.roll_adjust_stock"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/fabric/stock-in/template.xlsx",
+      "endpoint": "ui_fabric.stock_in_template_xlsx"
+    },
+    {
+      "methods": [
+        "POST"
+      ],
+      "rule": "/fabric/stock-in/import-xlsx",
+      "endpoint": "ui_fabric.stock_in_import_xlsx"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/fabric/new",
+      "endpoint": "ui_fabric.fabric_new"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/ink/",
+      "endpoint": "ui_ink.ink_list"
+    },
+    {
+      "methods": [
+        "POST"
+      ],
+      "rule": "/ink/<int:id>/delete",
+      "endpoint": "ui_ink.ink_delete"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/ink/<int:id>/edit",
+      "endpoint": "ui_ink.ink_edit"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/ink/new",
+      "endpoint": "ui_ink.ink_new"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/order/",
+      "endpoint": "ui_order.order_list"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/order/<int:id>",
+      "endpoint": "ui_order.order_view"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/order/<int:id>/edit",
+      "endpoint": "ui_order.order_edit"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/order/new",
+      "endpoint": "ui_order.order_new"
+    },
+    {
+      "methods": [
+        "POST"
+      ],
+      "rule": "/order/task/<int:task_id>/reopen",
+      "endpoint": "ui_order.task_reopen"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/order/item/<int:item_id>/delete",
+      "endpoint": "ui_order.order_item_delete"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/order/<int:id>/delete",
+      "endpoint": "ui_order.order_delete"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/production/",
+      "endpoint": "ui_production.production_dashboard"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/production/test-consume",
+      "endpoint": "ui_production.production_test_consume"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/production/task/<int:id>",
+      "endpoint": "ui_production.production_task_view"
+    },
+    {
+      "methods": [
+        "POST"
+      ],
+      "rule": "/production/task/<int:id>/done",
+      "endpoint": "ui_production.production_task_done"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/production/task/<int:id>/produce",
+      "endpoint": "ui_production.production_task_produce"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/fabric/stock-in",
+      "endpoint": "ui_fabric.stock_in_form"
+    },
+    {
+      "methods": [
+        "POST"
+      ],
+      "rule": "/fabric/stock-in/commit",
+      "endpoint": "ui_fabric.stock_in_commit"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/sample/",
+      "endpoint": "ui_sample.sample_list"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/sample/<int:id>",
+      "endpoint": "ui_sample.sample_view"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/sample/<int:id>/delete",
+      "endpoint": "ui_sample.sample_delete"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/__debug/build",
+      "endpoint": "ui.debug_build_info"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/__debug/i18n",
+      "endpoint": "ui.debug_i18n"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/__debug/whoami",
+      "endpoint": "ui.debug_whoami"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/sample/<int:id>/edit",
+      "endpoint": "ui_sample.sample_edit"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/sample/new",
+      "endpoint": "ui_sample.sample_new"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/settings/",
+      "endpoint": "ui_settings.settings_list"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/settings/activity",
+      "endpoint": "ui_settings.activity_log"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/wash/",
+      "endpoint": "ui_wash.wash_list"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/wash/session/<int:session_id>",
+      "endpoint": "ui_wash.wash_session_view"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/wash/register/<vat_code>",
+      "endpoint": "ui_wash.wash_register"
+    },
+    {
+      "rule": "/sample/<int:id>/pick-color",
+      "endpoint": "ui_sample.sample_pick_color",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "methods": [
+        "POST"
+      ],
+      "rule": "/wash/commit",
+      "endpoint": "ui_wash.wash_commit"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/wash/revoke/<int:session_id>",
+      "endpoint": "ui_wash.wash_revoke"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/wash/history",
+      "endpoint": "ui_wash.wash_history"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/data/swatches/<hex_code>.png",
+      "endpoint": "ui.color_swatch"
+    },
+    {
+      "methods": [
+        "POST"
+      ],
+      "rule": "/sample/<int:id>/color-corrections/save",
+      "endpoint": "ui_sample.sample_save_corrections"
+    },
+    {
+      "methods": [
+        "POST"
+      ],
+      "rule": "/sample/<int:id>/color-corrections/clear",
+      "endpoint": "ui_sample.color_corrections_clear"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/dashboard",
+      "endpoint": "ui.legacy_dashboard"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/old-production",
+      "endpoint": "ui.legacy_old_production"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/fabric/",
+      "endpoint": "ui_fabric.fabric_list"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/fabric/explorer",
+      "endpoint": "ui_fabric.fabric_explorer"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/fabric/cylinder/<int:id>/delete",
+      "endpoint": "ui_fabric.cylinder_delete"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/fabric/roll/<int:id>/delete",
+      "endpoint": "ui_fabric.roll_delete"
+    },
+    {
+      "methods": [
+        "POST"
+      ],
+      "rule": "/fabric/roll/<int:id>/deplete",
+      "endpoint": "ui_fabric.roll_deplete"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/fabric/roll/<int:id>/history",
+      "endpoint": "ui_fabric.roll_history"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/fabric/<int:id>/edit",
+      "endpoint": "ui_fabric.fabric_edit"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/fabric/cylinder/<int:id>/edit",
+      "endpoint": "ui_fabric.cylinder_edit"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/fabric/roll/<int:id>/edit",
+      "endpoint": "ui_fabric.roll_edit"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/wash/",
+      "endpoint": "ui_wash.wash_list"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "rule": "/wash/history",
+      "endpoint": "ui_wash.wash_history"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/wash/revoke/<int:session_id>",
+      "endpoint": "ui_wash.wash_revoke"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/wash/log/<int:log_id>/undo",
+      "endpoint": "ui_wash.wash_log_undo"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/production/log/<int:id>/edit",
+      "endpoint": "ui_production.production_log_edit"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/production/log/<int:id>/delete",
+      "endpoint": "ui_production.production_log_delete"
+    },
+    {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "rule": "/production/log/<int:id>/undo-wash",
+      "endpoint": "ui_production.production_log_undo_wash"
+    }
+  ],
+  "ignore_rules_prefix": [
+    "/static/"
+  ],
+  "ignore_endpoints": [
+    "static"
+  ],
+  "legacy_redirects": [
+    {
+      "methods": [
+        "GET"
+      ],
+      "from": "/dashboard",
+      "to": "/"
+    },
+    {
+      "methods": [
+        "GET"
+      ],
+      "from": "/old-production",
+      "to": "/production/"
+    }
+  ]
+}

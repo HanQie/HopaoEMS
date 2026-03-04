@@ -1,0 +1,103 @@
+{# Atomic/Base Macros #}
+
+{% macro ui_action_link(label, href, icon=None, tone='primary', size='sm', hook_class='', attrs='', u_props='') -%}
+{% set tones = {
+'primary': 'text-slate-600 hover:text-slate-900',
+'danger': 'text-rose-600 hover:text-rose-900',
+'neutral': 'text-slate-400 hover:text-slate-500',
+'warning': 'text-amber-600 hover:text-amber-900'
+} %}
+{% set sizes = {
+'xs': 'text-xs',
+'sm': 'text-sm'
+} %}
+{% set is_icon_only = icon and not label %}
+<a href="{{ href }}"
+    class="inline-flex items-center justify-center font-medium transition-colors {{ sizes[size] }} {{ tones[tone] }} {{ hook_class }} {{ 'w-9 h-9 ui-action-icon-only rounded-md hover:bg-slate-100 flex-shrink-0 relative z-10' if is_icon_only else 'px-3 py-1.5 gap-2' }}"
+    {{ attrs|safe }} {{ u_props|safe }}>
+    {% if icon %}
+    {{ ui_icon(icon) }}
+    {% endif %}
+    {% if label %}
+    <span>{{ label }}</span>
+    {% endif %}
+</a>
+{%- endmacro %}
+
+{% macro ui_dropdown_item(label, href, hook_class='', u_props='') -%}
+<a href="{{ href }}" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 {{ hook_class }}" role="menuitem"
+    tabindex="-1" {{ u_props|safe }}>
+    {{ label }}
+</a>
+{%- endmacro %}
+
+{% macro ui_link(label, href, variant='primary', tone='primary', size='md', bold=False, hook_class='', u_props='') -%}
+{% set sizes = {
+'sm': 'text-sm',
+'md': 'text-base',
+'lg': 'text-lg'
+} %}
+{% set tones = {
+'primary': 'text-indigo-600 hover:text-indigo-900',
+'secondary': 'text-slate-500 hover:text-slate-700',
+'danger': 'text-red-600 hover:text-red-900',
+'neutral': 'text-gray-500 hover:text-gray-700'
+} %}
+<a href="{{ href }}"
+    class="{{ sizes[size] }} {{ tones[tone] }} {{ 'font-bold' if bold else 'font-medium' }} {{ hook_class }}" {{
+    u_props|safe }}>
+    {{ label }}
+</a>
+{%- endmacro %}
+
+{% macro ui_data_payload(key, value) -%}
+<div hidden data-payload-key="{{ key }}" data-payload-value="{{ value }}"></div>
+{%- endmacro %}
+
+{% macro ui_icon(name, tone='neutral', class='', hook_class='') -%}
+{% set tones = {
+'neutral': 'text-slate-400',
+'primary': 'text-slate-900',
+'success': 'text-emerald-500',
+'warning': 'text-amber-500',
+'danger': 'text-rose-500',
+'info': 'text-blue-500'
+} %}
+<i class="bi bi-{{ name }} {{ tones[tone] }} {{ class }} {{ hook_class }}"></i>
+{%- endmacro %}
+
+{% macro alert(content, variant='info', dismissible=False) -%}
+{% set variants = {
+'info': 'bg-blue-50 border-blue-400 text-blue-700',
+'success': 'bg-emerald-50 border-emerald-400 text-emerald-700',
+'warning': 'bg-amber-50 border-amber-400 text-amber-700',
+'danger': 'bg-rose-50 border-rose-400 text-rose-700'
+} %}
+<div class="border-l-4 p-4 {{ variants[variant] }}">
+    <div class="flex">
+        <div class="flex-shrink-0">
+            {% if variant == 'info' %}<i class="bi bi-info-circle text-blue-400"></i>{% endif %}
+            {% if variant == 'success' %}<i class="bi bi-check-circle text-emerald-400"></i>{% endif %}
+            {% if variant == 'warning' %}<i class="bi bi-exclamation-triangle text-amber-400"></i>{% endif %}
+            {% if variant == 'danger' %}<i class="bi bi-x-circle text-rose-400"></i>{% endif %}
+        </div>
+        <div class="ml-3">
+            <p class="text-sm">
+                {{ content }}
+            </p>
+        </div>
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro ui_popover(hook_id, hidden=True, width='w-40', hook_class='', u_props='') -%}
+<div id="{{ hook_id }}" data-hook="{{ hook_id }}" {% if hidden %}hidden{% endif %}
+    class="absolute right-0 mt-2 {{ width }} rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-[100] {{ hook_class }}"
+    role="menu" aria-orientation="vertical" tabindex="-1" {{ u_props|safe }}>
+    <div class="py-1" role="none">
+        {% if caller %}
+        {{ caller() }}
+        {% endif %}
+    </div>
+</div>
+{%- endmacro %}

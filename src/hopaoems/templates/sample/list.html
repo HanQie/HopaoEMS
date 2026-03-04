@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% block page_width %}full{% endblock %}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/components.html' as C %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+
+{% block content %}
+{{ L.ui_page_header(title=t('sample.list.title'), description=t('sample.list.desc')) }}
+
+{% call L.ui_container(u_props='data-hook="sample-list-root"') %}
+
+{# Toolbar (Strict Phase 6) #}
+{{ C.ui_list_toolbar(
+search_key='sample',
+search_placeholder=t('common.search'),
+view_mode_key='sample',
+current_view=view,
+secondary_actions=(F.ui_button(label=t('sample.list.create_new'), href=url_for('ui_sample.sample_new'), icon='plus',
+variant='primary', size='sm') if is_operator() else None)
+) }}
+
+{% if samples %}
+
+{% if view == 'grid' %}
+{# Cards Panel (Grid View) #}
+{% call L.ui_box(u_props='data-hook="sample-cards-panel"') %}
+{# Strict Grid Density: 1 -> 2 -> 3 -> 4 #}
+{% call L.ui_grid(cols=4, gap=6, hook_class='sm:grid-cols-2 lg:grid-cols-4') %}
+{% for sample in samples %}
+{{ C.ui_sample_card(
+sample=sample,
+view_href=url_for('ui_sample.sample_view', id=sample.id),
+edit_href=url_for('ui_sample.sample_edit', id=sample.id),
+del_href=url_for('ui_sample.sample_delete', id=sample.id),
+is_operator=is_operator()
+) }}
+{% endfor %}
+{% endcall %}
+{% endcall %}
+{% endif %}
+
+{% if view == 'table' %}
+{# Table Panel (Hidden by Default) #}
+{% call C.ui_card(hook_class='', u_props='data-hook="sample-table-panel"') %}
+{% call C.ui_table(headers=[
+{'label': t('sample.list.columns.preview'), 'type': 'preview', 'width': '3.5rem'},
+{'label': t('sample.fields.no'), 'type': 'code'},
+{'label': t('sample.fields.title'), 'type': 'title'},
+{'label': t('fabric.fields.fabric_no'), 'type': 'code'},
+{'label': t('sample.fields.correction_count'), 'type': 'number'},
+{'label': t('sample.fields.task_count'), 'type': 'number'},
+{'label': t('sample.fields.sampled_date'), 'type': 'date'},
+{'label': t('sample.fields.version'), 'type': 'version'},
+{'label': t('common.actions'), 'type': 'action'}
+], density='compact', width_mode='fixed') %}
+{% for sample in samples %}
+{% call C.ui_tr() %}
+{# Preview thumbnail – consistent square via ui-thumb #}
+{% call C.ui_td(hook_class='') %}
+{% call L.ui_box(hook_class='ui-thumb') %}
+{% if sample.preview_path %}
+<img src="{{ url_for('ui.sample_image', filename=sample.preview_path) }}" alt="{{ sample.sample_no }}" loading="lazy">
+{% endif %}
+{% endcall %}
+{% endcall %}
+{# Sample No #}
+{{ C.ui_td(text=sample.sample_no or t('common.none'), type='code') }}
+{# Title – elastic, ellipsis #}
+{{ C.ui_td(text=sample.title or t('common.none'), type='title',
+u_props='title="' ~ (sample.title or '') ~ '"') }}
+{# Fabric No #}
+{{ C.ui_td(text=sample.fabric_no or '-', type='code') }}
+{# Correction Count #}
+{% call C.ui_td(type='number') %}{{ sample.correction_count }}{% endcall %}
+{# Task Count #}
+{% call C.ui_td(type='number') %}{{ sample.task_count }}{% endcall %}
+{# Sampled Date #}
+{% call C.ui_td(type='date', hook_class='text-slate-500') %}{{ sample.sampled_date if sample.sampled_date else '-'
+}}{% endcall %}
+{# Version #}
+{% call C.ui_td(type='version') %}V{{ sample.version or 1 }}{% endcall %}
+{# Actions #}
+{% call C.ui_td(type='action') %}
+{{ C.ui_row_actions(
+view_href=url_for('ui_sample.sample_view', id=sample.id),
+edit_href=url_for('ui_sample.sample_edit', id=sample.id),
+del_href=url_for('ui_sample.sample_delete', id=sample.id),
+is_operator=is_operator()
+) }}
+{% endcall %}
+{% endcall %}
+{% endfor %}
+{% endcall %}
+{% endcall %}
+
+{% endif %}
+
+{% else %}
+{{ C.ui_empty_state(title=t('sample.empty.title'), description=t('sample.empty.description'), icon='grid-3x3-gap') }}
+{% endif %}
+
+{{ C.ui_pagination(pagination, endpoint='ui_sample.sample_list') }}
+
+{# Lightbox Overlay #}
+{{ C.ui_sample_lightbox_overlay() }}
+{% endcall %}
+{% endblock %}
