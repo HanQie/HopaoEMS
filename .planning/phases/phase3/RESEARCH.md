@@ -1,0 +1,143 @@
+# Phase 3 Research: Audit Trail & Final Cleanup
+
+## Audit Log Requirements
+Critical actions to track:
+- `delete_log`: Who deleted which production log.
+- `undo_log` / `revoke_session`: Who reversed a wash state.
+- `adjust_roll_stock` / `deplete_roll`: Manual inventory changes.
+- `auth`: Logins (Optional but good for enterprise).
+
+Table Schema:
+- `id` (INTEGER PK)
+- `operator_id` (INTEGER FK -> users.id)
+- `action` (TEXT: 'DELETE', 'UNDO', 'ADJUST', etc)
+- `target_entity` (TEXT: 'production_log', 'wash_session', 'roll')
+- `target_id` (INTEGER)
+- `timestamp` (DATETIME DEFAULT CURRENT_TIMESTAMP)
+- `details` (TEXT JSON or summary)
+
+## Cleanup Targets (Root Directory)
+Redundant files identified for removal:
+- `ascii_errors.txt`
+- `cleanup_gate_output_2.txt`
+- `debug_gate_output.txt`
+- `debug_gates_v2.log`
+- `debug_gates.log`
+- `debug_gates.txt`
+- `debug_out.txt`
+- `debug_smoke.log`
+- `evidence_log.txt`
+- `evidence_test.sqlite`
+- `fabric_convergence_gates.txt`
+- `final_cleanup_output.txt`
+- `final_gate_check.txt`
+- `final_gate_result_v2.txt`
+- `final_gate_result_v3.txt`
+- `final_gate_result.txt`
+- `final_gate.txt`
+- `full_error.txt`
+- `full_gate_error.txt`
+- `full_gates_output.txt`
+- `gate_debug.txt`
+- `gate_err.txt`
+- `gate_error.txt`
+- `gate_final_v2.txt`
+- `gate_final.log`
+- `gate_final.txt`
+- `gate_full_capture_v2.txt`
+- `gate_full_capture.txt`
+- `gate_full_output.txt`
+- `gate_full.txt`
+- `gate_hotfix_v2.log`
+- `gate_hotfix.log`
+- `gate_log_1.txt`
+- `gate_log_2.txt`
+- `gate_log.txt`
+- `gate_out.txt`
+- `gate_output_2.txt`
+- `gate_output_3.txt`
+- `gate_output_4.txt`
+- `gate_output_5.txt`
+- `gate_output_6.txt`
+- `gate_output_7.txt`
+- `gate_output_ansi_v2.txt`
+- `gate_output_ansi.txt`
+- `gate_output_debug.txt`
+- `gate_output.txt`
+- `gate_report.txt`
+- `gate_result_fix.txt`
+- `gate_result_stabi.txt`
+- `gate_result.txt`
+- `gate_run_1.txt`
+- `gate_run_2.txt`
+- `gate_stderr.txt`
+- `gate_stdout.txt`
+- `gate_test.txt`
+- `gate.log`
+- `gates_debug.txt`
+- `gates_final.txt`
+- `gates_full.txt`
+- `gates_out.txt`
+- `gates_output.txt`
+- `gates.txt`
+- `jinja_errors.txt`
+- `migration_test.sqlite`
+- `out.log`
+- `output.txt`
+- `output2.txt`
+- `p0_output.txt`
+- `parity_output.txt`
+- `routes_verification_output.txt`
+- `run_gates_canonical.log`
+- `run_gates_error.log`
+- `run_gates_final_2.log`
+- `run_gates_final_3.log`
+- `run_gates_final_try_2.log`
+- `run_gates_final_try.log`
+- `run_gates_final.log`
+- `run_gates_output.log`
+- `run_gates_phase1.log`
+- `run_gates_retry_2.log`
+- `run_gates_retry_3.log`
+- `run_gates_retry_4.log`
+- `run_gates_retry.log`
+- `smoke_dbg.txt`
+- `smoke_debug.txt`
+- `smoke_error_utf8.txt`
+- `smoke_error_v2.log`
+- `smoke_error.log`
+- `smoke_error.txt`
+- `smoke_full_debug.txt`
+- `smoke_full.log`
+- `smoke_latest_2.txt`
+- `smoke_latest_3.txt`
+- `smoke_latest_4.txt`
+- `smoke_latest_5.txt`
+- `smoke_latest.txt`
+- `smoke_log_v2.txt`
+- `smoke_log.txt`
+- `smoke_only_output_2.txt`
+- `smoke_only_output.txt`
+- `smoke_out.txt`
+- `smoke_output6.txt`
+- `smoke_result.txt`
+- `smoke_tests_canonical.log`
+- `smoke_tests_final.log`
+- `smoke_tests_phase1.log`
+- `smoke_tests_retry.log`
+- `test_out.txt`
+- `test_output.txt`
+- `verification_output.txt`
+- `verification_report.txt`
+- `verify_output_ansi.txt`
+- `verify_output.txt`
+- `violations.txt`
+
+Essential Files (DO NOT DELETE):
+- `gate.bat`
+- `README.md`
+- `requirements.txt`
+- `boot.bat`
+- `*.py` (Core scripts)
+- `Hopao Ems V2 readme.docx` / `HopaoEMS_v2.pdf`
+- `.planning/`, `src/`, `tests/`, `tools/`, `.git/`, `.venv/`, `docs/`, `instance/`

@@ -1,0 +1,9 @@
+{
+  "project_name": "HopaoEMS v2",
+  "workflow": "Standard GSD",
+  "preferences": {
+    "auto_verify": true,
+    "quality_gate": ".\gate.bat",
+    "strict_ui": true
+  }
+}

@@ -1,5 +1,6 @@
 # Python
-__pycache__/
+**/__pycache__/
+**/*.pyc
 *.py[cod]
 *$py.class
 .pytest_cache/
@@ -8,18 +9,19 @@ __pycache__/
 # Do NOT add .venv/ to this ignore file.
 
 # Runtime Databases — never tracked
-src/hopaoems/instance/*.sqlite
-src/hopaoems/instance/*.db
+src/**/instance/**/*.sqlite
+src/instance/**
 src/data/*.db
 *.sqlite
 *.db
 
 # Uploads & Generated Assets — never tracked
+src/data/uploads/**
+src/**/uploads/temp/**
 src/hopaoems/instance/uploads/**
 !src/hopaoems/instance/uploads/.gitkeep
 src/uploads/**
 !src/uploads/.gitkeep
-src/data/uploads/**
 !src/data/uploads/.gitkeep
 
 # Test / QA Output — never tracked
