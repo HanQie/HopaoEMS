@@ -5,9 +5,8 @@
 *$py.class
 .pytest_cache/
 
-# NOTE: .venv/ is intentionally tracked in this repo.
-# Do NOT add .venv/ to this ignore file.
-
+.venv/
+.env
 # Runtime Databases — never tracked
 src/**/instance/**/*.sqlite
 src/instance/**
