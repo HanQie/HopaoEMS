@@ -59,9 +59,11 @@ document.addEventListener('DOMContentLoaded', () => {
     HopaoUI.boot();
 
     // 3. Simple Interaction Toggles
-    // 3. Simple Interaction Toggles
     initWashHistoryToggle();
     initFileInputs();
+
+    // 4. QR Code Modal
+    initQRCodeModal();
 });
 
 /**
@@ -463,6 +465,69 @@ function initLangMenu() {
                 const t = document.querySelector(`[data-target="${m.dataset.hook}"]`);
                 if (t) t.setAttribute('aria-expanded', 'false');
             });
+        }
+    });
+}
+
+/**
+ * Initialize Mobile Login QR Code Modal
+ * Targets: [data-action="qr-modal-open"], [data-action="qr-modal-close"], #qr-modal, #qr-code-container
+ */
+function initQRCodeModal() {
+    let qrInst = null;
+
+    document.addEventListener('click', (e) => {
+        // Open Modal
+        const openBtn = e.target.closest('[data-action="qr-modal-open"]');
+        if (openBtn) {
+            e.preventDefault();
+            const modal = document.getElementById('qr-modal');
+            const container = document.getElementById('qr-code-container');
+            const urlText = document.getElementById('qr-code-url-text');
+
+            if (modal && container) {
+                // Get current origin (e.g. http://192.168.1.5:8080)
+                const currentUrl = window.location.origin;
+
+                // Set the text
+                if (urlText) urlText.textContent = currentUrl;
+
+                // Generate QR (only once or override)
+                container.replaceChildren(); // clear previous
+
+                if (typeof QRCode !== 'undefined') {
+                    qrInst = new QRCode(container, {
+                        text: currentUrl,
+                        width: 200,
+                        height: 200,
+                        colorDark: "#000000",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                } else {
+                    container.textContent = 'QR Code library failed to load.';
+                }
+
+                modal.hidden = false;
+            }
+        }
+
+        // Close Modal
+        const closeBtn = e.target.closest('[data-action="qr-modal-close"]');
+        if (closeBtn) {
+            e.preventDefault();
+            const modal = document.getElementById('qr-modal');
+            if (modal) modal.hidden = true;
+        }
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const modal = document.getElementById('qr-modal');
+            if (modal && !modal.hidden) {
+                modal.hidden = true;
+            }
         }
     });
 }

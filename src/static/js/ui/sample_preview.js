@@ -50,7 +50,7 @@ HopaoUI.register('sample_preview', () => {
     const saveDraft = () => {
         const body = document.querySelector(getH('CC_TBODY'));
         if (!body) return;
-        const rows = body.querySelectorAll('tr');
+        const rows = body.querySelectorAll('[data-hook="cc-row"]');
         const data = Array.from(rows).map(row => {
             const r = row.querySelector('[name="cc_r"]')?.value;
             if (r === undefined) return null;
@@ -78,7 +78,7 @@ HopaoUI.register('sample_preview', () => {
         const empty = document.querySelector(getH('CC_EMPTY'));
         const table = document.querySelector(getH('CC_TABLE'));
         if (body && empty && table) {
-            const rowCount = body.querySelectorAll('tr').length;
+            const rowCount = body.querySelectorAll('[data-hook="cc-row"]').length;
             const hasRows = rowCount > 0;
             empty.hidden = hasRows;
             table.hidden = !hasRows;
@@ -106,7 +106,7 @@ HopaoUI.register('sample_preview', () => {
         if (!body || !template) return;
 
         const clone = template.content.cloneNode(true);
-        const row = clone.querySelector('tr');
+        const row = clone.querySelector('[data-hook="cc-row"]');
         if (!row) return;
 
         const uniqueId = 'mode_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
@@ -330,7 +330,7 @@ HopaoUI.register('sample_preview', () => {
         }
 
         // Remove row
-        const removeBtn = e.target.closest(getA('REMOVE_ROW'));
+        const removeBtn = e.target.closest('[data-action="cc-remove-row"]');
         if (removeBtn) {
             e.preventDefault();
             const row = removeBtn.closest('[data-hook="cc-row"]');
@@ -353,7 +353,7 @@ HopaoUI.register('sample_preview', () => {
     document.addEventListener('change', (e) => {
         const modeRadio = e.target.closest('input[type="radio"][data-action="cc-mode"]');
         if (modeRadio) {
-            const row = modeRadio.closest('tr');
+            const row = modeRadio.closest('[data-hook="cc-row"]');
             const hiddenInput = row.querySelector('[name="cc_mode"]');
             if (hiddenInput) {
                 hiddenInput.value = modeRadio.value;

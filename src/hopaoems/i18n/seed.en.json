@@ -488,6 +488,7 @@
   "main.title": "Dashboard",
   "material": "material",
   "nav.dashboard": "Dashboard",
+  "nav.mobile_login_qr": "Mobile Login QR",
   "nav.fabrics": "Fabric Management",
   "nav.history": "History",
   "nav.inks": "Ink Management",

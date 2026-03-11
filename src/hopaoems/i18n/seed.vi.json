@@ -485,6 +485,7 @@
   "main.title": "Dashboard",
   "material": "material",
   "nav.dashboard": "Bảng điều khiển",
+  "nav.mobile_login_qr": "Mã QR Đăng nhập",
   "nav.fabrics": "Quản lý vải",
   "nav.history": "Lịch sử",
   "nav.inks": "Quản lý mực",

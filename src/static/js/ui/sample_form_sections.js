@@ -13,7 +13,7 @@ HopaoUI.register('sample_form_sections', () => {
 
     function updateSummary() {
         if (!counter || !tbody) return;
-        const count = tbody.querySelectorAll('tr').length;
+        const count = tbody.querySelectorAll('[data-hook="cc-row"]').length;
         const pattern = counter.dataset.pattern || "Selections: {count}";
         counter.textContent = pattern.replace('{count}', count);
     }

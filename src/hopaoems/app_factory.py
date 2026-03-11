@@ -1,7 +1,42 @@
-
 import os
-from flask import Flask
+from flask import Flask, request, has_request_context
+from jinja2 import BaseLoader, TemplateNotFound, FileSystemLoader
 from .services import db, i18n
+
+class MobileTemplateLoader(BaseLoader):
+    """
+    自定義的 Template Loader，用於實作設備嗅探與手機版視圖攔截。
+    當判定為手機設備時，優先去 mobile_templates/ 尋找對應的 HTML。
+    如果找不到或是電腦設備，自動 fallback 回原本的 templates/。
+    這個層級的攔截不會影響任何業務邏輯、路由或後端驗證。
+    """
+    def __init__(self, mobile_folder, desktop_folder):
+        self.mobile_loader = FileSystemLoader(mobile_folder)
+        self.desktop_loader = FileSystemLoader(desktop_folder)
+
+    def get_source(self, environment, template):
+        is_mobile = False
+        if has_request_context():
+            user_agent = request.user_agent.string.lower()
+            # 常見的手機裝置關鍵字
+            if any(kw in user_agent for kw in ['mobi', 'android', 'iphone', 'ipad', 'ipod']):
+                is_mobile = True
+        
+        if is_mobile:
+            try:
+                # 優先嘗試載入手機版模板
+                return self.mobile_loader.get_source(environment, template)
+            except TemplateNotFound:
+                # 該模板在手機版目錄還沒建立，fallback 到常規版
+                pass
+                
+        return self.desktop_loader.get_source(environment, template)
+        
+    def list_templates(self):
+        templates = set()
+        templates.update(self.mobile_loader.list_templates())
+        templates.update(self.desktop_loader.list_templates())
+        return list(templates)
 
 def create_app(test_config=None):
     # root_path: .../src/hopaoems
@@ -16,6 +51,19 @@ def create_app(test_config=None):
                 static_folder=os.path.join(project_src, 'static'),
                 static_url_path='/static',
                 template_folder=os.path.join(root_path, 'templates'))
+    
+    # 動態建立 mobile_templates 資料夾（如果不存在的話）
+    mobile_templates_dir = os.path.join(root_path, 'mobile_templates')
+    os.makedirs(mobile_templates_dir, exist_ok=True)
+    
+    # 覆寫並套用自定義的 Jinja2 Template Loader
+    app.jinja_env.loader = MobileTemplateLoader(
+        mobile_folder=mobile_templates_dir,
+        desktop_folder=app.template_folder
+    )
+    
+    # 關閉 Jinja2 的內部 AST 緩存以避免電腦版與手機版拿到錯誤的快取（Template Name 相同導致的碰撞）
+    app.jinja_env.cache = None
     
     app.config['SAMPLES_UPLOAD_DIR'] = samples_upload_dir
 

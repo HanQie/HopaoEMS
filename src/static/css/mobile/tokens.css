@@ -1,0 +1,49 @@
+:root {
+    /* Mobile Theme Tokens (Optimized for contrast and touch) */
+    --ui-fg-base: #0f172a;
+    /* slate-900 */
+    --ui-fg-muted: #64748b;
+    /* slate-500 */
+    --ui-fg-subtle: #94a3b8;
+    /* slate-400 */
+
+    --ui-bg-topbar: #ffffff;
+    --ui-bg-bottomnav: #ffffff;
+    --ui-bg-card: #ffffff;
+    --ui-bg-body: #f8fafc;
+    /* slate-50 */
+
+    --ui-border: #e2e8f0;
+    /* slate-200 */
+    --ui-border-hover: #cbd5e1;
+    /* border-slate-300 */
+    --ui-border-active: #0f172a;
+    /* border-slate-900 */
+
+    /* Mobile Geometry Tokens */
+    --ui-header-h: 3.5rem;
+    /* 56px, standard mobile header */
+    --ui-bottomnav-h: 4rem;
+    /* 64px, safe tap area bottom */
+    --ui-touch-target: 44px;
+    /* Apple HIG minimum touch target */
+
+    /* Spacing Tokens */
+    --ui-space-1: 0.25rem;
+    --ui-space-2: 0.5rem;
+    --ui-space-4: 1rem;
+    --ui-space-6: 1.5rem;
+    --ui-space-8: 2rem;
+}
+
+html,
+body {
+    height: 100%;
+    /* Keep overflow handling for bottom nav */
+    overflow: hidden;
+    background-color: var(--ui-bg-body);
+}
+
+[hidden] {
+    display: none !important;
+}

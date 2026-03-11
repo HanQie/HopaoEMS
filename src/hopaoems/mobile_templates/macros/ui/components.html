@@ -1,0 +1,940 @@
+{# Components Macros - Updated for Phase 3 #}
+{% import 'macros/ui/layout.html' as L %}
+{% import 'macros/ui/forms.html' as F %}
+{% import 'macros/ui/base.html' as A %}
+{% macro ui_alert(tone='neutral', hook_class='', u_props='') -%}
+{% set tones = {
+'neutral': 'bg-slate-50 text-slate-700 border-slate-200',
+'success': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+'warning': 'bg-amber-50 text-amber-700 border-amber-200',
+'danger': 'bg-rose-50 text-rose-700 border-rose-200',
+'info': 'bg-blue-50 text-blue-700 border-blue-200'
+} %}
+<div class="p-4 rounded-md border {{ tones[tone] }} mb-6 {{ hook_class }}" {{ u_props|safe }}>
+    <div class="flex">
+        <div class="flex-shrink-0">
+            {% if tone == 'success' %}<i class="bi bi-check-circle-fill"></i>
+            {% elif tone == 'warning' %}<i class="bi bi-exclamation-triangle-fill"></i>
+            {% elif tone == 'danger' %}<i class="bi bi-x-circle-fill"></i>
+            {% elif tone == 'info' %}<i class="bi bi-info-circle-fill"></i>
+            {% else %}<i class="bi bi-bell-fill"></i>{% endif %}
+        </div>
+        <div class="ml-3">
+            <div class="text-sm">
+                {% if caller %}
+                {{ caller() }}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro ui_card(title=None, actions=None, hook_class='', scrollable=False, u_props='') -%}
+<div class="bg-white overflow-visible shadow rounded-lg border border-slate-200 {{ hook_class }}" {{ u_props|safe }}>
+    {% if title or actions %}
+    <div class="px-4 py-5 sm:px-6 border-b border-slate-200 flex justify-between items-center">
+        {% if title %}
+        <h3 class="text-lg leading-6 font-medium text-slate-900">{{ title }}</h3>
+        {% endif %}
+        {% if actions %}
+        <div class="flex gap-2">
+            {{ actions }}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    <div class="px-4 py-5 sm:p-6">
+        {% if caller %}
+        {{ caller() }}
+        {% endif %}
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro ui_table(headers, rows=None, empty_message=None, hook_class='', u_props='', body_hook='',
+density='comfortable', width_mode='fixed') -%}
+{% set th_padding = 'px-4 py-2' if density == 'compact' else 'px-6 py-3' %}
+{% set empty_padding = 'px-4 py-6' if density == 'compact' else 'px-6 py-12' %}
+{% set table_cls = 'ui-table--' ~ width_mode %}
+{% set density_cls = 'ui-table--compact' if density == 'compact' else '' %}
+<div class="flex flex-col ui-table {{ density_cls }} {{ hook_class }} {{ 'overflow-x-auto' if width_mode == 'scroll' else '' }}"
+    {{ u_props|safe }}>
+    <div class="-my-2 -mx-4 sm:-mx-6 lg:-mx-8">
+        <div class="py-2 align-middle block min-w-full sm:px-6 lg:px-8">
+            <div class="overflow-hidden sm:rounded-none max-inline-size-full">
+                <table class="mobile-card-list {{ table_cls }}">
+                    <colgroup>
+                        {% for header in headers %}
+                        {% set type = header.get('type', 'text') if header is mapping else 'text' %}
+                        {% set w = header.get('width') if header is mapping else None %}
+
+                        {# Dynamic rem-based widths from tokens #}
+                        {% set locked_w = 'var(--ui-col-date)' if type == 'date'
+                        else ('var(--ui-col-status)' if type == 'status'
+                        else ('var(--ui-col-number)' if type in ['number', 'numeric']
+                        else ('var(--ui-col-action)' if type == 'action'
+                        else w))) %}
+
+                        <col class="ui-table__col--{{ type }}" {% if locked_w %}style="width: {{ locked_w }}" {% endif
+                            %}>
+                        {% endfor %}
+                    </colgroup>
+                    <thead class="bg-slate-50">
+                        <tr>
+                            {% for header in headers %}
+                            {% set type = header.get('type', 'text') if header is mapping else 'text' %}
+                            {% set align = header.get('align') if header is mapping else None %}
+
+                            {% set final_align = 'start' %}
+                            {% set align_class = '' %}
+
+                            {% set cls = header.get('cls') if header is mapping else '' %}
+                            {% set lbl = header.get('label') if header is mapping else header %}
+                            {% set aria = ('aria-label="' ~ header.get('aria_label') ~ '"') if header is mapping and
+                            header.get('aria_label') else '' %}
+                            <th scope="col" {{ aria|safe }}
+                                class="ui-table__th--{{ type }} {{ cls }} whitespace-nowrap text-xs font-medium text-slate-500 uppercase tracking-wider">
+                                <div class="{{ 'ui-table-cell-truncate' if type == 'text' else '' }}">
+                                    {{ lbl }}
+                                </div>
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-slate-200" {% if body_hook %}data-hook="{{ body_hook }}" {%
+                        endif %}>
+                        {% if caller %}
+                        {{ caller() }}
+                        {% elif rows is not none and not rows %}
+                        <tr>
+                            <td colspan="{{ headers|length }}"
+                                class="{{ empty_padding }} text-center text-sm text-slate-500">
+                                {{ empty_message or t('common.no_data') }}
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro ui_thead(density='comfortable', hook_class='', u_props='') -%}
+<thead class="bg-slate-50 {{ hook_class }}" {{ u_props|safe }}>
+    {{ caller() }}
+</thead>
+{%- endmacro %}
+
+{% macro ui_th(type='text', align=None, density='comfortable', hook_class='', u_props='') -%}
+<th scope="col"
+    class="ui-table__th--{{ type }} {{ align_class }} whitespace-nowrap text-xs font-medium text-slate-500 uppercase tracking-wider overflow-hidden text-ellipsis {{ hook_class }}"
+    {{ u_props|safe }}>
+    {{ caller() }}
+</th>
+{%- endmacro %}
+
+{% macro ui_tbody(density='comfortable', hook_class='', u_props='') -%}
+<tbody class="bg-white divide-y divide-slate-200 {{ hook_class }}" {{ u_props|safe }}>
+    {{ caller() }}
+</tbody>
+{%- endmacro %}
+
+{% macro ui_tr(density='comfortable', hook_class='', u_props='') -%}
+<tr class="{{ hook_class }}" {{ u_props|safe }}>
+    {{ caller() }}
+</tr>
+{%- endmacro %}
+
+{% macro ui_actions_stack(items, empty_label=None, hook_class='', u_props='') -%}
+<div class="{{ hook_class }}" {{ u_props|safe }}>
+    {% set ns = namespace(valid=False) %}
+    {% for item in items %}
+    {% if item %}{% set ns.valid = True %}{% endif %}
+    {% endfor %}
+
+    {% if ns.valid %}
+    {% call L.ui_stack(direction='col', spacing=1, align='end') %}
+    {% for item in items %}
+    {% if item %}
+    {{ item }}
+    {% endif %}
+    {% endfor %}
+    {% endcall %}
+    {% else %}
+    <span class="text-sm text-slate-400">{{ empty_label or t('common.none') }}</span>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro ui_row_actions(view_href=None, edit_href=None, del_href=None, is_operator=False, hook_class='', u_props='',
+u_props_view='', u_props_edit='', u_props_del='') -%}
+{# Fixed-width Row Actions: View, Edit, Delete – placeholders keep alignment when actions are missing #}
+{% call L.ui_stack(direction='row', align='center', justify='end', spacing=2, hook_class=hook_class,
+u_props='data-hook="row-actions" ' ~ u_props) %}
+{# Slot 1: View #}
+{% call L.ui_box(hook_class='flex', u_props='data-hook="row-action-slot"') %}
+{% if view_href %}
+{{ A.ui_action_link(label=None, href=view_href, icon='eye', tone='neutral', u_props='title="' ~ t('common.view') ~ '"
+aria-label="' ~ t('common.view') ~ '" ' ~ u_props_view) }}
+{% else %}
+<span aria-hidden="true" class="w-8 h-8 block"></span>
+{% endif %}
+{% endcall %}
+{# Slot 2: Edit (operator only) #}
+{% call L.ui_box(hook_class='flex', u_props='data-hook="row-action-slot"') %}
+{% if is_operator and edit_href %}
+{{ A.ui_action_link(label=None, href=edit_href, icon='pencil', tone='neutral', u_props='title="' ~ t('common.edit') ~ '"
+aria-label="' ~ t('common.edit') ~ '" ' ~ u_props_edit) }}
+{% else %}
+<span aria-hidden="true" class="w-8 h-8 block"></span>
+{% endif %}
+{% endcall %}
+{# Slot 3: Delete (operator only) #}
+{% call L.ui_box(hook_class='flex', u_props='data-hook="row-action-slot"') %}
+{% if is_operator and del_href %}
+{{ A.ui_action_link(label=None, href=del_href, icon='trash', tone='danger', u_props='title="' ~ t('common.delete') ~ '"
+aria-label="' ~ t('common.delete') ~ '" ' ~ u_props_del) }}
+{% else %}
+<span aria-hidden="true" class="w-8 h-8 block"></span>
+{% endif %}
+{% endcall %}
+{% endcall %}
+{%- endmacro %}
+
+{% macro ui_td(type='text', align=None, text=None, bold=False, hook_class='', density='comfortable', u_props='') -%}
+{% set alignment_class = '' %}
+{% set wrap_cls = 'whitespace-normal' if type in ['inventory', 'measure'] else 'whitespace-nowrap' %}
+{% set label_attr = '' %}
+{% if type == 'action' %}
+{% set hook_class = hook_class ~ ' actions-cell' %}
+{% endif %}
+<td class="ui-table__cell--{{ type }} {{ wrap_cls }} text-sm text-slate-900 {{ alignment_class }} {{ hook_class }}" {{
+    u_props|safe }}>
+    <div class="{{ 'ui-table-cell-truncate' if type == 'text' else '' }} w-full text-right flex justify-end">
+        {% if text %}
+        <span class="{{ 'font-medium' if bold else '' }}">{{ text }}</span>
+        {% elif caller %}
+        {{ caller() }}
+        {% endif %}
+    </div>
+</td>
+{%- endmacro %}
+
+{% macro ui_badge(label, tone='neutral', u_props='') -%}
+{% set tones = {
+'neutral': 'bg-slate-100 text-slate-800',
+'success': 'bg-emerald-100 text-emerald-800',
+'warning': 'bg-amber-100 text-amber-800',
+'danger': 'bg-rose-100 text-rose-800',
+'info': 'bg-blue-100 text-blue-800'
+} %}
+<span
+    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ tones.get(tone, tones.neutral) }}"
+    {{ u_props|safe }}>
+    {{ label }}
+</span>
+{%- endmacro %}
+
+{% macro ui_status_badge(kind, value, ts=None, u_props='') -%}
+{% set tone_map = {
+'wash': {
+'washed': 'success',
+'unwashed': 'warning'
+},
+'roll': {
+'in_stock': 'success',
+'depleted': 'neutral'
+},
+'order': {
+'open': 'success',
+'pending': 'warning',
+'active': 'success',
+'closed': 'neutral',
+'done': 'neutral'
+},
+'task': {
+'printing': 'info',
+'done': 'success',
+'canceled': 'neutral'
+}
+} %}
+
+{% set label_map = {
+'wash': {
+'washed': t('production.log.status.washed'),
+'unwashed': t('production.log.status.unwashed')
+},
+'roll': {
+'in_stock': t('roll.status.in_stock'),
+'depleted': t('roll.status.depleted')
+},
+'order': {
+'open': t('order.status.open'),
+'pending': t('order.status.pending'),
+'active': t('order.status.open'),
+'closed': t('order.status.closed'),
+'done': t('order.status.closed')
+},
+'task': {
+'printing': t('production.status.printing'),
+'done': t('common.done'),
+'canceled': t('common.canceled')
+}
+} %}
+
+{% set tone = tone_map.get(kind, {}).get(value, 'neutral') %}
+{% set label = label_map.get(kind, {}).get(value, value) %}
+
+{% if label %}
+{% call L.ui_stack(spacing=1, align='center', hook_class='inline-flex') %}
+{{ ui_badge(label=label, tone=tone, u_props=u_props) }}
+{% if ts %}
+{{ ui_text(text=ts[:16], variant='small', tone='subtle') }}
+{% endif %}
+{% endcall %}
+{% else %}
+{{ t('common.none') }}
+{% endif %}
+{%- endmacro %}
+
+{% macro ui_unwashed_metric(count, length_m=None, u_props='') -%}
+{% if count and count > 0 %}
+{% set label = ui_fmt_ratio_count_length(count, length_m) %}
+{{ ui_badge(label=label, tone='danger', u_props=u_props) }}
+{% else %}
+{{ ui_text(text=t('common.none'), tone='subtle', u_props=u_props) }}
+{% endif %}
+{%- endmacro %}
+
+{% macro ui_stat_card(label, value=None, hint=None, tone='neutral', href=None, u_props='') -%}
+{% set tones = {
+'neutral': 'border-slate-200',
+'success': 'border-emerald-200 bg-emerald-50/30',
+'warning': 'border-amber-200 bg-amber-50/30',
+'danger': 'border-rose-200 bg-rose-50/30',
+'info': 'border-blue-200 bg-blue-50/30'
+} %}
+{% set card_body %}
+<div class="space-y-1">
+    <div class="text-sm font-medium text-slate-500 truncate">{{ label }}</div>
+    <div class="text-2xl font-semibold text-slate-900">
+        {% if value is not none %}{{ value }}{% endif %}
+        {% if caller %}{{ caller() }}{% endif %}
+    </div>
+    {% if hint %}
+    <div class="text-xs text-slate-400">{{ hint }}</div>
+    {% endif %}
+</div>
+{% endset %}
+
+{% if href %}
+<a href="{{ href }}"
+    class="block px-4 py-5 bg-white shadow-sm rounded-lg overflow-hidden border h-full flex flex-col justify-center {{ tones.get(tone, tones.neutral) }} hover:shadow-md transition-shadow cursor-pointer"
+    {{ u_props|safe }}>
+    {{ card_body }}
+</a>
+{% else %}
+<div class="px-4 py-5 bg-white shadow-sm flex flex-col justify-center rounded-lg overflow-hidden border h-full {{ tones.get(tone, tones.neutral) }}"
+    {{ u_props|safe }}>
+    {{ card_body }}
+</div>
+{% endif %}
+{%- endmacro %}
+
+{# Alias for ui_stat_card for backward compatibility #}
+{% macro ui_stat(label, value=None, subtext=None, tone='neutral', u_props='') -%}
+{{ ui_stat_card(label=label, value=value, hint=subtext, tone=tone, u_props=u_props) }}
+{%- endmacro %}
+
+
+{% macro ui_row_actions_fixed(slot1=None, slot2=None, slot3=None, hook_class='') -%}
+<div class="ui-action-stack {{ hook_class }} whitespace-nowrap inline-flex">
+    <div class="min-w-[2.5rem] flex justify-center">{{ slot1|safe if slot1 else '' }}</div>
+    <div class="min-w-[2.5rem] flex justify-center">{{ slot2|safe if slot2 else '' }}</div>
+    <div class="min-w-[2.5rem] flex justify-center">{{ slot3|safe if slot3 else '' }}</div>
+</div>
+{% endmacro %}
+
+{% macro ui_stat_inline(label, value, tone='neutral', u_props='') -%}
+<div class="flex items-center gap-2 bg-slate-100 rounded px-3 py-1" {{ u_props|safe }}>
+    <span class="text-xs text-slate-500 font-medium">{{ label }}</span>
+    <span class="text-sm font-semibold text-slate-700">{{ value }}</span>
+</div>
+{%- endmacro %}
+
+{% macro ui_stat_grid(items, cols=4, u_props='') -%}
+{% set grid_cols = {
+2: 'sm:grid-cols-2',
+3: 'sm:grid-cols-3',
+4: 'sm:grid-cols-4'
+} %}
+<div class="grid grid-cols-1 gap-5 items-stretch {{ grid_cols.get(cols, 'sm:grid-cols-4') }}" {{ u_props|safe }}>
+    {% for item in items %}
+    {{ ui_stat_card(label=item.label, value=item.value, hint=item.hint|default(None), tone=item.tone|default('neutral'))
+    }}
+    {% endfor %}
+</div>
+{%- endmacro %}
+
+{% macro ui_value_meta(primary, meta=None, hook_class='') -%}
+<div class="ui-value-meta {{ hook_class }}">
+    <div class="ui-value-meta__primary">{{ primary|safe }}</div>
+    {% if meta %}
+    <div class="ui-value-meta__meta">{{ meta|safe }}</div>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro ui_tabs(items, active_key=None, hook_class='', u_props='') -%}
+<nav class="ui-tabs {{ hook_class }}" {{ u_props|safe }}>
+    {% for item in items %}
+    <a href="{{ item.href }}" class="ui-tabs__item {{ 'is-active' if active_key == item.key else '' }}">
+        {{ item.label }}
+    </a>
+    {% endfor %}
+</nav>
+{%- endmacro %}
+
+{% macro ui_measure(value, unit, hook_class='') -%}
+<span class="ui-measure {{ hook_class }}">
+    <span class="ui-num">{{ value }}</span>
+    <span class="ui-unit">{{ unit }}</span>
+</span>
+{%- endmacro %}
+
+{% macro ui_text(text=None, variant='body', tone='neutral', bold=False, hook_class='', u_props='') -%}
+{% set variants = {
+'h1': 'text-2xl font-bold',
+'h2': 'text-xl font-semibold',
+'h3': 'text-lg font-medium',
+'body': 'text-sm',
+'small': 'text-xs',
+'mono': 'font-mono text-sm',
+'subtitle': 'text-sm font-semibold uppercase tracking-wider text-slate-500',
+'preline': 'text-sm ui-preline'
+} %}
+{% set tones = {
+'neutral': 'text-slate-900',
+'subtle': 'text-slate-500',
+'success': 'text-emerald-600',
+'danger': 'text-rose-600',
+'warning': 'text-amber-600',
+'info': 'text-blue-600'
+} %}
+<span
+    class="{{ variants.get(variant, variants['body']) }} {{ tones.get(tone, tones.neutral) }} {{ 'font-bold' if bold else '' }} {{ hook_class }}"
+    {{ u_props|safe }}>
+    {% if text %}{{ text }}{% endif %}{% if caller %}{{ caller() }}{% endif %}
+</span>
+{%- endmacro %}
+
+{# Shared Formatting Macros (Phase 7 P1) #}
+{% macro ui_fmt_length_m(value) -%}
+{% if value is not none %}{{ ui_measure("%.1f"|format(value|float), t('common.unit.m')) }}{% else %}{{
+t('common.none') }}{%
+endif %}
+{%- endmacro %}
+
+{% macro ui_fmt_ratio_count_length(count, length_m) -%}
+{% set c = count if count is not none else 0 %}
+{{ c }} / {{ ui_fmt_length_m(length_m) }}
+{%- endmacro %}
+
+{% macro ui_fmt_date(dt) -%}
+{% if dt %}{{ dt[:10] }}{% else %}{% endif %}
+{%- endmacro %}
+
+{% macro ui_fmt_dt_min(dt) -%}
+{% if dt %}{{ dt[:16] }}{% else %}{{ t('common.none') }}{% endif %}
+{%- endmacro %}
+
+{# Unified List Toolbar (Phase 6 Strict) #}
+{% macro ui_view_toggle(key, current='table', u_props='') -%}
+{# Standardized View Toggle: Single-button switch (Phase 7) #}
+{% set is_table = (current == 'table') %}
+{% set next_view = 'grid' if is_table else 'table' %}
+{% set icon = 'grid-3x3-gap' if is_table else 'table' %}
+{% set label = t('common.view_mode.grid') if is_table else t('common.view_mode.table') %}
+
+{# Build Next Href preserving query #}
+{% set req_args = request.args.to_dict() %}
+{% set _ = req_args.update({'view': next_view}) %}
+{% set next_href = url_for(request.endpoint, **req_args) %}
+
+<div class="inline-flex" data-hook="{{ key }}-view-mode">
+    {{ F.ui_button(label=label, icon=icon, variant='secondary', size='sm', href=next_href,
+    u_props='data-hook="' ~ key ~ '-view-toggle" data-action="' ~ key ~ '-view-toggle" data-current="' ~ current ~ '" '
+    ~ u_props) }}
+    {# Dummy hooks for contract tests #}
+    <div hidden data-hook="{{ key }}-view-grid"></div>
+    <div hidden data-hook="{{ key }}-view-table"></div>
+</div>
+{%- endmacro %}
+
+{% macro ui_list_toolbar(search_key=None, search_placeholder=None, search_aria_label=None, view_mode_key=None,
+current_view='table', new_href=None, new_label=None, new_icon='plus', search_hidden_inputs=None,
+secondary_actions=None, tabs=None) -%}
+{# Refined 3-Block Toolbar (Phase 8 Strict) #}
+{# Tabs Block (flex-1) | Search Block (flex-none) | Actions Block (flex-none) #}
+<div class="grid grid-cols-[1fr_auto_auto] items-end gap-4 mb-6">
+    <div class="min-w-0">
+        {% if tabs %}
+        <div
+            class="flex items-center space-x-4 border-b border-slate-200 pb-0 overflow-hidden text-ellipsis whitespace-nowrap">
+            {{ tabs }}
+        </div>
+        {% endif %}
+    </div>
+
+    {# Block 2: Search - Fixed width for pixel-perfect stability #}
+    <div class="w-64">
+        {% if search_key %}
+        {% call F.ui_form(method="GET", hook_class='flex', u_props='data-hook="' ~ search_key ~
+        '-search-form"') %}
+        {% if search_hidden_inputs %}{{ search_hidden_inputs|safe }}{% endif %}
+        {{ F.ui_input(name='q', value=request.args.get('q', ''), placeholder=search_placeholder or
+        t('common.search.placeholder'),
+        u_props='data-hook="' ~ search_key ~ '-search-input" aria-label="' ~ (search_aria_label or
+        t('common.search.aria_label')) ~ '"', size='sm', hook_class='w-full') }}
+        {% endcall %}
+        {% endif %}
+    </div>
+
+    {# Block 3: Actions - flex-none pinned to right edge of grid #}
+    <div class="flex items-center gap-3">
+        {% if caller %}
+        {{ caller() }}
+        {% endif %}
+
+        {% if view_mode_key %}
+        {{ ui_view_toggle(key=view_mode_key, current=current_view) }}
+        {% endif %}
+
+        {% if secondary_actions %}
+        {{ secondary_actions }}
+        {% endif %}
+
+        {% if new_href and is_operator() %}
+        {{ F.ui_button(label=new_label or t('common.create_new'), href=new_href, icon=new_icon, variant='primary') }}
+        {% endif %}
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro ui_hero(title, description, actions=None) -%}
+<div class="text-center py-20">
+    <h1 class="text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl">{{ title }}</h1>
+    <p class="mt-6 text-lg leading-8 text-slate-600">{{ description }}</p>
+    {% if actions %}
+    <div class="mt-10 flex items-center justify-center gap-x-6">
+        {{ actions }}
+    </div>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro ui_swatch(color, u_props='') -%}
+{% set hex = color.lstrip('#') if color else 'FFFFFF' %}
+<img {{ u_props|safe }} src="/data/swatches/{{ hex }}.png" class="inline-block w-6 h-6 rounded border border-slate-200"
+    alt="{{ color }}">
+{%- endmacro %}
+
+{% macro ui_draft_swatch_img(hook='') -%}
+<img {% if hook %}data-hook="{{ hook }}" {% endif %} src="" class="w-6 h-6 rounded border border-slate-200"
+    alt="swatch">
+{%- endmacro %}
+
+{% macro ui_dashed_box(tone='neutral', aspect=None, hook_class='') -%}
+{% set tones = {
+'neutral': 'bg-slate-50 text-slate-500',
+'white': 'bg-white text-slate-500'
+} %}
+{% set aspect_class = 'aspect-' ~ aspect if aspect else '' %}
+<div
+    class="border-2 border-dashed border-slate-300 rounded-lg p-12 text-center flex flex-col items-center justify-center {{ tones[tone] }} {{ aspect_class }} {{ hook_class }}">
+    {% if caller %}
+    {{ caller() }}
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro ui_progress_bar(value_pct, aria_label_key=None, tone='primary', size='md', hook_class='', printed_m=None,
+target_m=None, show_text=True) -%}
+{% set safe_pct = [value_pct|int, 0]|max %}
+{% set safe_pct = [safe_pct, 100]|min %}
+{% set sizes = {'sm': 'h-1', 'md': 'h-2', 'lg': 'h-4', 'compact': 'h-1.5'} %}
+{% set tones = {
+'primary': '[&::-webkit-progress-value]:bg-slate-900 [&::-moz-progress-bar]:bg-slate-900 text-slate-900 bg-slate-100',
+'success': '[&::-webkit-progress-value]:bg-emerald-500 [&::-moz-progress-bar]:bg-emerald-500 text-emerald-500
+bg-emerald-50 text-emerald-500',
+'warning': '[&::-webkit-progress-value]:bg-amber-500 [&::-moz-progress-bar]:bg-amber-500 text-amber-500 bg-amber-50',
+'danger': '[&::-webkit-progress-value]:bg-rose-500 [&::-moz-progress-bar]:bg-rose-500 text-rose-500 bg-rose-50',
+'info': '[&::-webkit-progress-value]:bg-blue-500 [&::-moz-progress-bar]:bg-blue-500 text-blue-500 bg-blue-50'
+} %}
+{% set h = sizes.get(size, 'h-2') %}
+{% set c = tones.get(tone, tones.primary) %}
+<div class="w-full flex-col flex {% if size == 'compact' %}min-w-[15rem]{% endif %}">
+    {% if show_text and (printed_m is not none) and (target_m is not none) %}
+    <div class="flex justify-between items-end text-xs mb-1">
+        <span class="text-slate-500 tabular-nums">{{ ui_fmt_length_m(printed_m) }} / {{ ui_fmt_length_m(target_m)
+            }}</span>
+        <span class="{{ c.split(' ')[-1] if tone == 'success' else 'text-slate-500' }} font-medium tabular-nums">{{
+            safe_pct }}%</span>
+    </div>
+    {% endif %}
+    <progress class="w-full appearance-none overflow-hidden rounded-full {{ h }} {{ c }} {{ hook_class }}"
+        value="{{ safe_pct }}" max="100" role="progressbar" aria-valuenow="{{ safe_pct|int }}" aria-valuemin="0"
+        aria-valuemax="100" {% if aria_label_key %}aria-label="{{ aria_label_key }}" title="{{ aria_label_key }}" {%
+        endif %}></progress>
+</div>
+{%- endmacro %}
+
+{% macro ui_panel(border=True, tone='neutral', hook_class='', u_props='') -%}
+{% set tones = {
+'neutral': 'bg-slate-50',
+'white': 'bg-white'
+} %}
+<div class="{{ tones[tone] }} rounded-md p-4 {{ 'border border-slate-200' if border else '' }} {{ hook_class }}" {{
+    u_props|safe }}>
+    {% if caller %}
+    {{ caller() }}
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro ui_label(text) -%}
+<p class="text-xs text-slate-500">{{ text }}</p>
+{%- endmacro %}
+
+{% macro ui_vat_group_header(vat_code, tone_idx, meta=None, variant='default', hook_class='') -%}
+{# 8 Morandi Tones: Sage, Blue, Stone, Mauve, Teal, Rose, Olive, Lavender #}
+{% set palettes = [
+'bg-teal-50 border-teal-200 text-teal-800',
+'bg-slate-100 border-slate-200 text-slate-700',
+'bg-stone-50 border-stone-200 text-stone-700',
+'bg-fuchsia-50 border-fuchsia-200 text-fuchsia-800',
+'bg-sky-50 border-sky-200 text-sky-800',
+'bg-pink-50 border-pink-200 text-pink-800',
+'bg-lime-50 border-lime-200 text-lime-900',
+'bg-violet-50 border-violet-200 text-violet-800'
+] %}
+{% set style = palettes[tone_idx % 8] %}
+{% if variant == 'minimal' %}
+<div class="flex justify-between items-center px-0 py-1 mb-2 {{ hook_class }}">
+    <div class="flex items-center gap-3">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">{{ t('common.vat') }}</span>
+        <span class="text-lg font-bold text-slate-800">{{ vat_code }}</span>
+    </div>
+    {% if meta %}
+    <span class="text-xs font-medium text-slate-500">{{ meta }}</span>
+    {% endif %}
+</div>
+{% else %}
+<div class="flex justify-between items-center px-4 py-2 border-l-4 rounded-r-md mb-2 {{ style }} {{ hook_class }}">
+    <div class="flex items-center gap-3">
+        <span class="text-xs font-bold uppercase tracking-wider opacity-70">{{ t('common.vat') }}</span>
+        <span class="text-sm font-bold">{{ vat_code }}</span>
+    </div>
+    {% if meta %}
+    <span class="text-xs font-medium opacity-80">{{ meta }}</span>
+    {% endif %}
+</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro ui_thumbnail(src, fallback_icon='image', size='md', alt='thumbnail', u_props='') -%}
+{% set sizes = {
+'md': 'w-16 h-16',
+'lg': 'w-24 h-24',
+'xl': 'w-full max-w-2xl aspect-auto'
+} %}
+<div class="{{ sizes[size] }} flex-shrink-0 bg-slate-100 rounded-md overflow-hidden border border-slate-200 flex items-center justify-center"
+    {{ u_props|safe }}>
+    {% if src %}
+    <img src="{{ src }}" class="w-full h-full object-cover" alt="{{ alt }}">
+    {% else %}
+    <i class="bi bi-{{ fallback_icon }} text-slate-400"></i>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro ui_sample_thumb(preview_path, size='md', img_hook='') -%}
+{% set sizes = {
+'sm': 'w-10 h-10',
+'md': 'w-16 h-16',
+'lg': 'w-24 h-24',
+'xl': 'w-full max-w-2xl aspect-square'
+} %}
+<div
+    class="{{ sizes[size] if size in sizes else 'w-16 h-16' }} flex-shrink-0 bg-slate-100 rounded-md overflow-hidden border border-slate-200 flex items-center justify-center">
+    {% if preview_path %}
+    <img src="{{ url_for('ui.sample_image', filename=preview_path) }}"
+        class="w-full h-full {{ 'object-contain' if size == 'xl' else 'object-cover' }}" alt="thumbnail" {% if img_hook
+        %}data-hook="{{ img_hook }}" {% endif %}>
+    {% else %}
+    <div class="flex flex-col items-center gap-1">
+        <i class="bi bi-image text-slate-400 text-2xl"></i>
+    </div>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro ui_local_image_preview(initial_src=None) -%}
+<div
+    class="relative w-full aspect-square bg-slate-100 rounded-md overflow-hidden border-2 border-dashed border-slate-300 flex items-center justify-center">
+    {# Strict hooks required by Gate #}
+    {% set has_initial = initial_src is not none %}
+    <img {% if not has_initial %}hidden{% endif %}
+        src="{{ url_for('ui.sample_image', filename=initial_src) if has_initial else '' }}"
+        data-hook="sample-preview-img" alt="preview" class="w-full h-full object-contain cursor-crosshair z-10" {% if
+        has_initial %}data-server-render="true" {% endif %}>
+    <div data-hook="sample-preview-placeholder" {% if has_initial %}hidden{% endif %}
+        class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 text-sm gap-2">
+        <i class="bi bi-image text-3xl"></i>
+        <span>{{ t('sample.preview_placeholder') }}</span>
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro ui_empty_state(title, icon='Inbox', description=None, actions=None, hook_class='', u_props='') -%}
+<div class="text-center py-12 px-4 {{ hook_class }}" {{ u_props|safe }}>
+    <i class="bi bi-{{ icon }} text-slate-300 text-4xl mb-4 block"></i>
+    <h3 class="text-sm font-medium text-slate-900">{{ title }}</h3>
+    {% if description %}
+    <p class="mt-1 text-sm text-slate-500">{{ description }}</p>
+    {% endif %}
+    {% if actions %}
+    <div class="mt-6">
+        {{ actions }}
+    </div>
+    {% endif %}
+</div>
+{%- endmacro %}
+{% macro ui_sample_card(sample, view_href, edit_href=None, del_href=None, is_operator=False, hook_class='', u_props='',
+u_props_view='', u_props_edit='', u_props_del='')
+-%}
+<div class="bg-white rounded-lg shadow overflow-hidden border border-slate-200 flex flex-col {{ hook_class }}" {{
+    u_props|safe }} data-hook="sample-card" data-sample-id="{{ sample.id }}">
+
+    {# Thumbnail (Fixed 4:3) #}
+    {% set thumb_url = url_for('ui.sample_image', filename=sample.preview_path) if sample.preview_path else '' %}
+    <a href="{{ view_href }}" class="block w-full aspect-[4/3] relative bg-slate-100 group/image overflow-hidden"
+        data-hook="sample-card-thumb" data-src="{{ thumb_url }}" data-title="{{ sample.title }}">
+        {% if sample.preview_path %}
+        <img src="{{ thumb_url }}" alt="{{ sample.title }}"
+            class="w-full h-full object-cover transition-transform duration-500 group-hover/image:scale-105">
+        {% else %}
+        <div class="absolute inset-0 flex items-center justify-center text-slate-400">
+            <i class="bi bi-image text-4xl"></i>
+        </div>
+        {% endif %}
+
+        {# Version Badge #}
+        {% if sample.version %}
+        <div class="absolute top-2 left-2 z-10">
+            <span
+                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/90 text-slate-800 shadow-sm backdrop-blur-sm">
+                V{{ sample.version }}
+            </span>
+        </div>
+        {% endif %}
+    </a>
+
+    {# Info & Actions (Fixed Height Area) #}
+    <div class="p-3 border-t border-slate-100 flex flex-col gap-2">
+        {# Actions Row (Strategy B - Standardized) #}
+        <div class="flex items-center justify-end gap-1">
+            {{ A.ui_action_link(href=view_href, icon='eye', tone='neutral', u_props='title="' ~ t('common.view') ~ '"
+            aria-label="' ~ t('common.view') ~ '" ' ~ u_props_view) }}
+            {% if is_operator %}
+            {% if edit_href %}
+            {{ A.ui_action_link(href=edit_href, icon='pencil', tone='neutral', u_props='title="' ~ t('common.edit') ~ '"
+            aria-label="' ~ t('common.edit') ~ '" ' ~ u_props_edit) }}
+            {% endif %}
+            {% if del_href %}
+            {{ A.ui_action_link(href=del_href, icon='trash', tone='danger', u_props='title="' ~ t('common.delete') ~ '"
+            aria-label="' ~ t('common.delete') ~ '" ' ~ u_props_del) }}
+            {% endif %}
+            {% endif %}
+        </div>
+
+        {# Info Rows #}
+        <div class="flex flex-col gap-0.5">
+            <div class="text-xs text-slate-500 font-mono truncate">{{ sample.sample_no or t('common.none') }}</div>
+            <div class="text-sm font-medium text-slate-900 truncate" title="{{ sample.title }}">{{ sample.title or
+                t('common.none') }}</div>
+        </div>
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro ui_image(src, alt='', hook_class='', u_props='') -%}
+<img src="{{ src }}" alt="{{ alt }}" class="{{ hook_class }}" {{ u_props|safe }}>
+{%- endmacro %}
+
+{% macro ui_modal(title='', hook='modal', close_hook='modal-close', u_props='') -%}
+<div data-hook="{{ hook }}" hidden
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 transition-opacity" {{ u_props|safe }}>
+    <button type="button" aria-label="{{ t('common.close') }}" data-hook="{{ close_hook }}"
+        class="absolute top-4 right-4 text-white/70 hover:text-white transition-colors p-2 z-60 cursor-pointer">
+        <i class="bi bi-x-lg text-3xl"></i>
+    </button>
+
+    <div class="relative max-w-7xl max-h-full flex flex-col items-center">
+        {% if title %}
+        <div class="mb-4 text-white text-xl font-semibold">{{ title }}</div>
+        {% endif %}
+        {% if caller %}
+        {{ caller() }}
+        {% endif %}
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro ui_sample_preview_compact(initial_src=None, hook_class='', u_props='') -%}
+<div class="relative w-full {{ hook_class or 'h-48' }} bg-slate-100 rounded-md overflow-hidden flex items-center justify-center cursor-pointer transition-colors"
+    data-hook="sample-preview-open-picker" {{ u_props|safe }}>
+    {% set has_initial = initial_src is not none %}
+    <img {% if not has_initial %}hidden{% endif %}
+        src="{{ url_for('ui.sample_image', filename=initial_src) if has_initial else '' }}"
+        data-hook="sample-preview-img" alt="preview" class="w-full h-full object-contain" {% if has_initial
+        %}data-server-render="true" {% endif %}>
+    <div data-hook="sample-preview-placeholder" {% if has_initial %}hidden{% endif %}
+        class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 text-sm gap-2">
+        <i class="bi bi-cloud-arrow-up text-3xl"></i>
+        <span>{{ t('sample.preview_placeholder') }}</span>
+    </div>
+
+    {# Picker Hint Text integrated into component footer #}
+    <div class="absolute bottom-2 left-0 right-0 text-center text-xs text-slate-400 opacity-80" data-hook="picked-rgb">
+        {{ t('sample.picker.hint_open') }}
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro ui_sample_picker_modal(u_props='') -%}
+{% call ui_modal(title=t('sample.picker.title'), hook='sample-picker-modal', close_hook='sample-picker-close',
+u_props=u_props) %}
+<img data-hook="sample-picker-img" alt="{{ t('sample.preview') }}"
+    class="max-w-full max-h-[75vh] object-contain rounded shadow-2xl bg-black/50 cursor-crosshair">
+<div data-hook="sample-picker-status" class="mt-4 text-white/90 text-sm text-center">
+    {{ t('sample.picker.hint_click') }}
+</div>
+{% endcall %}
+{%- endmacro %}
+
+{% macro ui_sample_lightbox_overlay(u_props='') -%}
+<div data-hook="sample-lightbox" hidden
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 transition-opacity" {{ u_props|safe }}>
+    <button type="button" aria-label="{{ t('common.close') }}" data-hook="sample-lightbox-close"
+        class="absolute top-4 right-4 text-white/70 hover:text-white transition-colors p-2 z-60 cursor-pointer">
+        <i class="bi bi-x-lg text-3xl"></i>
+    </button>
+
+    <div class="relative max-w-7xl max-h-full flex flex-col items-center">
+        <img data-hook="sample-lightbox-img" alt="{{ t('sample.preview') }}"
+            class="max-w-full max-h-[85vh] object-contain rounded shadow-2xl bg-black/50">
+        <div data-hook="sample-lightbox-title" class="mt-4 text-white/90 text-lg font-medium text-center"></div>
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro ui_divider(hook_class='', u_props='') -%}
+<div class="border-t border-slate-200 {{ hook_class }}" {{ u_props|safe }}></div>
+{%- endmacro %}
+
+{# ── ui_progress_bar ──────────────────────────────────────────────────────────
+Strict no-JS, no-inline-style progress bar via native <progress> element.
+    Parameters:
+    value_pct – integer or float 0–100 (required)
+    label – aria-label / assistive text (optional)
+    tone – 'primary' (default) | 'success' | 'warning' | 'danger'
+    CSS class .ui-progress is defined in main.css (no Tailwind inline tokens).
+    #}
+    {% macro ui_progress_bar_legacy(value_pct, label=None, tone='primary', size='sm') -%}
+    {% set safe_pct = [value_pct|int, 0]|max %}
+    {% set safe_pct = [safe_pct, 100]|min %}
+    <progress class="ui-progress ui-progress--{{ tone }} ui-progress--{{ size }}" value="{{ safe_pct }}" max="100"
+        role="progressbar" aria-valuenow="{{ safe_pct|int }}" aria-valuemin="0" aria-valuemax="100" {% if label
+        %}aria-label="{{ label }}" title="{{ label }}" {% endif %}></progress>
+    {%- endmacro %}
+
+    {% macro ui_row_actions_fixed(slot1=None, slot2=None, slot3=None, hook_class='') -%}
+    {#
+    Strict 3-Slot Actions Container for Production Lists.
+    Ensures absolute width stability even when actions (like Complete) are absent.
+    #}
+    {% call L.ui_stack(direction='row', align='center', justify='end', spacing=2, hook_class=hook_class,
+    u_props='data-hook="prod-row-actions"') %}
+    {# Slot 1 (e.g. View) #}
+    {% call L.ui_box(hook_class='flex', u_props='data-hook="prod-row-actions-slot"') %}
+    {% if slot1 and slot1|string != 'None' %}{{ slot1 }}{% else %}<span aria-hidden="true"
+        class="w-8 h-8 block"></span>{% endif %}
+    {% endcall %}
+
+    {# Slot 2 (e.g. Produce/Play) #}
+    {% call L.ui_box(hook_class='flex', u_props='data-hook="prod-row-actions-slot"') %}
+    {% if slot2 and slot2|string != 'None' %}{{ slot2 }}{% else %}<span aria-hidden="true"
+        class="w-8 h-8 block"></span>{% endif %}
+    {% endcall %}
+
+    {# Slot 3 (e.g. Complete) #}
+    {% call L.ui_box(hook_class='flex', u_props='data-hook="prod-row-actions-slot"') %}
+    {% if slot3 and slot3|string != 'None' %}{{ slot3 }}{% else %}<span aria-hidden="true"
+        class="w-8 h-8 block"></span>{% endif %}
+    {% endcall %}
+    {% endcall %}
+    {%- endmacro %}
+
+    {% macro ui_pagination(pagination, endpoint) -%}
+    {% if pagination.total_pages > 1 %}
+    <nav class="flex items-center justify-between border-t border-slate-200 px-4 py-3 sm:px-6 mt-4"
+        aria-label="Pagination">
+        <div class="hidden sm:block">
+            <p class="text-sm text-slate-700">
+                {{ t('common.pagination.showing') }}
+                <span class="font-medium">{{ (pagination.page - 1) * pagination.page_size + 1 }}</span>
+                {{ t('common.pagination.to') }}
+                <span class="font-medium">{{ [pagination.page * pagination.page_size, pagination.total]|min }}</span>
+                {{ t('common.pagination.of') }}
+                <span class="font-medium">{{ pagination.total }}</span>
+                {{ t('common.pagination.results') }}
+            </p>
+        </div>
+        <div class="flex flex-1 justify-between sm:justify-end gap-2">
+            {% set req_args = request.args.to_dict() %}
+
+            {% if pagination.has_prev %}
+            <a href="{{ url_for(endpoint, page=pagination.prev_num, **req_args) }}"
+                class="inline-flex items-center justify-center font-medium rounded-md shadow-sm bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 text-sm">
+                {{ t('common.pagination.previous') }}
+            </a>
+            {% else %}
+            <button disabled
+                class="inline-flex items-center justify-center font-medium rounded-md shadow-sm bg-white border border-slate-300 text-slate-700 opacity-50 cursor-not-allowed px-4 py-2 text-sm">
+                {{ t('common.pagination.previous') }}
+            </button>
+            {% endif %}
+
+            <div class="hidden md:flex items-center px-4 text-sm font-medium text-slate-700">
+                {{ pagination.page }} / {{ pagination.total_pages }}
+            </div>
+
+            {% if pagination.has_next %}
+            <a href="{{ url_for(endpoint, page=pagination.next_num, **req_args) }}"
+                class="inline-flex items-center justify-center font-medium rounded-md shadow-sm bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 text-sm">
+                {{ t('common.pagination.next') }}
+            </a>
+            {% else %}
+            <button disabled
+                class="inline-flex items-center justify-center font-medium rounded-md shadow-sm bg-white border border-slate-300 text-slate-700 opacity-50 cursor-not-allowed px-4 py-2 text-sm">
+                {{ t('common.pagination.next') }}
+            </button>
+            {% endif %}
+        </div>
+    </nav>
+    {% endif %}
+    {%- endmacro %}

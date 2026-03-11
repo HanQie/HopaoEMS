@@ -15,12 +15,14 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HopaoEMS v2</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HopaoEMS Mobile</title>
     <!-- CSS Policy: Only approved global styles -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css', v=asset_version) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile/tokens.css', v=asset_version) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile/layout.css', v=asset_version) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile/components.css', v=asset_version) }}">
 
 </head>
 
@@ -31,43 +33,24 @@
     md:px-6' %}
     <header class="ui-shell__topbar">
         <div class="{{ header_cls }}">
+            {# Side: Logo #}
             <div class="flex items-center">
                 <a href="/" class="flex items-center gap-2">
                     <span class="text-xl font-bold tracking-tight text-slate-900">HopaoEMS</span>
+                    <span
+                        class="px-1.5 py-0.5 rounded bg-slate-900 text-white text-[10px] font-bold uppercase">v2</span>
                 </a>
             </div>
 
-            {# Center: Navigation Slots (Equal Width) #}
+            {# Center: Navigation Slots (Hidden on topbar for mobile) #}
             {% if current_user %}
-            <nav class="ui-shell__nav grid grid-flow-col auto-cols-fr h-full">
-                {{ ui_shell_nav_item(t('nav.dashboard'), url_for('ui.index'), icon='house', active=(request.endpoint ==
-                'ui.index')) }}
-                {{ ui_shell_nav_item(t('nav.fabrics'), url_for('ui_fabric.fabric_list'), icon='archive',
-                active=(request.blueprint == 'ui_fabric')) }}
-                {{ ui_shell_nav_item(t('nav.samples'), url_for('ui_sample.sample_list'), icon='images',
-                active=(request.blueprint == 'ui_sample')) }}
-                {{ ui_shell_nav_item(t('nav.orders'), url_for('ui_order.order_list'), icon='file-text',
-                active=(request.blueprint == 'ui_order')) }}
-                {{ ui_shell_nav_item(t('nav.production'), url_for('ui_production.production_dashboard'), icon='inboxes',
-                active=(request.blueprint == 'ui_production')) }}
-                {{ ui_shell_nav_item(t('nav.wash'), url_for('ui_wash.wash_list'), icon='droplet',
-                active=(request.blueprint == 'ui_wash')) }}
-                {{ ui_shell_nav_item(t('nav.inks'), url_for('ui_ink.ink_list'), icon='palette',
-                active=(request.blueprint == 'ui_ink')) }}
-            </nav>
+            <div class="ui-shell__nav-mobile-placeholder"></div>
             {% else %}
             <div></div> {# Empty container for center slot when logged out #}
             {% endif %}
 
             {# Side: User Hub (Fixed 12rem) #}
             <div class="ui-shell__user flex justify-end items-center gap-2">
-                {# QR Code Action #}
-                <button type="button" data-action="qr-modal-open"
-                    class="ui-action-icon-only text-slate-500 hover:text-slate-900"
-                    title="{{ t('nav.mobile_login_qr') }}">
-                    <i class="bi bi-qr-code-scan"></i>
-                </button>
-
                 {# Language Switcher (Always available) #}
                 <div class="relative">
                     <button type="button" data-action="lang-menu-toggle" data-target="lang-menu"
@@ -112,8 +95,8 @@
     </header>
 
     {# Main Content Area #}
-    <main class="flex-1 overflow-y-auto py-10">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <main class="ui-shell__main">
+        <div class="ui-page-container">
             {# Flash Messages #}
             {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -140,37 +123,23 @@
         </div>
     </main>
 
-    {# QR Code Modal #}
-    <div id="qr-modal" hidden class="relative z-50 flex items-center justify-center inset-0 fixed"
-        aria-labelledby="modal-title" role="dialog" aria-modal="true">
-        <div class="fixed inset-0 bg-slate-500 bg-opacity-75 transition-opacity" data-action="qr-modal-close"></div>
-
-        <div
-            class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-sm">
-            <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-                <div class="sm:flex sm:items-start">
-                    <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
-                        <h3 class="text-base font-semibold leading-6 text-slate-900" id="modal-title">
-                            {{ t('nav.mobile_login_qr') }}
-                        </h3>
-                        <div class="mt-4 flex justify-center">
-                            {# Container for the generated QR code #}
-                            <div id="qr-code-container" class="p-2 bg-white rounded-lg"></div>
-                        </div>
-                        <p class="mt-2 text-sm text-slate-500 text-center" id="qr-code-url-text">
-                            <!-- URL text injected via JS -->
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <div class="bg-slate-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                <button type="button" data-action="qr-modal-close"
-                    class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 sm:mt-0 sm:w-auto">
-                    {{ t('common.close') }}
-                </button>
-            </div>
-        </div>
-    </div>
+    {# Bottom Navigation Bar for Mobile #}
+    {% if current_user %}
+    <nav class="ui-shell__bottomnav">
+        {{ ui_shell_nav_item(t('nav.dashboard'), url_for('ui.index'), icon='house', active=(request.endpoint ==
+        'ui.index')) }}
+        {{ ui_shell_nav_item(t('nav.fabrics'), url_for('ui_fabric.fabric_list'), icon='archive',
+        active=(request.blueprint == 'ui_fabric')) }}
+        {{ ui_shell_nav_item(t('nav.samples'), url_for('ui_sample.sample_list'), icon='images',
+        active=(request.blueprint == 'ui_sample')) }}
+        {{ ui_shell_nav_item(t('nav.orders'), url_for('ui_order.order_list'), icon='file-text',
+        active=(request.blueprint == 'ui_order')) }}
+        {{ ui_shell_nav_item(t('nav.production'), url_for('ui_production.production_dashboard'), icon='inboxes',
+        active=(request.blueprint == 'ui_production')) }}
+        {{ ui_shell_nav_item(t('nav.wash'), url_for('ui_wash.wash_list'), icon='droplet',
+        active=(request.blueprint == 'ui_wash')) }}
+    </nav>
+    {% endif %}
 
     {# Global Scripts #}
     <script src="{{ url_for('static', filename='vendor/qrcodejs/qrcode.min.js', v=asset_version) }}"></script>
@@ -194,10 +163,9 @@
 {%- endmacro %}
 
 {% macro ui_shell_nav_item(label, href, icon, active=False) -%}
-<a href="{{ href }}"
-    class="flex items-center justify-center gap-2 border-b-2 px-1 text-sm font-medium transition-colors {{ 'border-slate-900 text-slate-900' if active else 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700' }}">
+<a href="{{ href }}" class="ui-shell__nav-link {{ 'active' if active else '' }}">
     <i class="bi bi-{{ icon }}"></i>
-    <span>{{ label }}</span>
+    <span class="truncate w-full px-1 text-center">{{ label }}</span>
 </a>
 {%- endmacro %}
 
