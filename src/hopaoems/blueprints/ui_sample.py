@@ -250,6 +250,7 @@ def sample_edit(id):
         return "Sample not found", 404
         
     if request.method == 'POST':
+        sample_no = request.form.get('sample_no')
         title = request.form.get('title')
         fabric_no = request.form.get('fabric_no')
         date_received = request.form.get('date_received')
@@ -307,6 +308,7 @@ def sample_edit(id):
 
         sample_repo.update_sample(
             id=id,
+            sample_no=sample_no,
             title=title,
             fabric_no=fabric_no,
             date_received=date_received,

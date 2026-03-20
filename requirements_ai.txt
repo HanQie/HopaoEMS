@@ -1,0 +1,21 @@
+# requirements_ai.txt
+# HopaoEMS AI 助理依賴（Ollama 版本）
+# 安裝指令（在專案根目錄執行，確認 .venv 已啟動）：
+#   pip install -r requirements_ai.txt
+
+# ----- Ollama Python SDK -----
+ollama>=0.2.0
+
+# ----- 圖片處理 -----
+Pillow>=10.0.0
+
+# ----- Phase 3: 圖片向量化（CLIP，CPU 可用，無需 GPU）-----
+sentence-transformers>=2.6.0
+
+# ----- 數值計算 -----
+numpy>=1.24.0,<2.0.0
+
+# ----- 輔助依賴 -----
+requests>=2.31.0
+tqdm>=4.66.0
+psutil>=5.9.0

@@ -22,6 +22,10 @@ src/hopaoems/instance/uploads/**
 src/uploads/**
 !src/uploads/.gitkeep
 !src/data/uploads/.gitkeep
+src/hopaoems/static/uploads/temp_ai/**
+
+# AI Models
+models/
 
 # Test / QA Output — never tracked
 *.log

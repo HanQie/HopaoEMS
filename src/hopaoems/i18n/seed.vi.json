@@ -34,6 +34,7 @@
     "common.machine_status": "tt_dictionary",
     "common.mirror_print": "tt_dictionary",
     "common.net_weight": "tt_dictionary",
+    "common.new_chat": "Cuộc trò chuyện mới",
     "common.next": "hardcoded",
     "common.no": "hardcoded",
     "common.no_data": "hardcoded",
@@ -1028,5 +1029,11 @@
   "fabric.intake.import.error.missing_roll_no": "Dòng {row}: roll_no là bắt buộc.",
   "fabric.intake.import.error.invalid_weight": "Dòng {row}: weight_kg phải là số dương.",
   "common.apply": "Áp dụng",
-  "fabric.intake.import.error.duplicate_roll_no": "Dòng {row}: Trùng roll_no '{value}'."
+  "fabric.intake.import.error.duplicate_roll_no": "Dòng {row}: Trùng roll_no '{value}'.",
+  "ai.chat.title": "Trợ lý AI",
+  "ai.chat.placeholder": "Nhập câu hỏi hoặc lệnh...",
+  "ai.chat.upload_image": "Tải lên hình ảnh",
+  "ai.chat.clear_image": "Xóa hình ảnh",
+  "ai.ocr.upload": "Tải ảnh lên nhận dạng",
+  "ai.error.model_not_ready": "Mô hình AI chưa sẵn sàng, vui lòng liên hệ quản trị viên"
 }

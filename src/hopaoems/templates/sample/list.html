@@ -45,13 +45,14 @@ is_operator=is_operator()
 {% call C.ui_card(hook_class='', u_props='data-hook="sample-table-panel"') %}
 {% call C.ui_table(headers=[
 {'label': t('sample.list.columns.preview'), 'type': 'preview', 'width': '3.5rem'},
-{'label': t('sample.fields.no'), 'type': 'code'},
-{'label': t('sample.fields.title'), 'type': 'title'},
-{'label': t('fabric.fields.fabric_no'), 'type': 'code'},
+{'label': t('sample.fields.no'), 'type': 'text'},
+{'label': t('sample.fields.title'), 'type': 'text'},
+{'label': t('fabric.fields.fabric_no'), 'type': 'text'},
 {'label': t('sample.fields.correction_count'), 'type': 'number'},
 {'label': t('sample.fields.task_count'), 'type': 'number'},
 {'label': t('sample.fields.sampled_date'), 'type': 'date'},
 {'label': t('sample.fields.version'), 'type': 'version'},
+{'label': t('common.remark'), 'type': 'text'},
 {'label': t('common.actions'), 'type': 'action'}
 ], density='compact', width_mode='fixed') %}
 {% for sample in samples %}
@@ -65,12 +66,13 @@ is_operator=is_operator()
 {% endcall %}
 {% endcall %}
 {# Sample No #}
-{{ C.ui_td(text=sample.sample_no or t('common.none'), type='code') }}
+{{ C.ui_td(text=sample.sample_no or t('common.none'), type='text',
+u_props='title="' ~ (sample.sample_no or '') ~ '"') }}
 {# Title – elastic, ellipsis #}
-{{ C.ui_td(text=sample.title or t('common.none'), type='title',
+{{ C.ui_td(text=sample.title or t('common.none'), type='text',
 u_props='title="' ~ (sample.title or '') ~ '"') }}
 {# Fabric No #}
-{{ C.ui_td(text=sample.fabric_no or '-', type='code') }}
+{{ C.ui_td(text=sample.fabric_no or '-', type='text') }}
 {# Correction Count #}
 {% call C.ui_td(type='number') %}{{ sample.correction_count }}{% endcall %}
 {# Task Count #}
@@ -80,6 +82,8 @@ u_props='title="' ~ (sample.title or '') ~ '"') }}
 }}{% endcall %}
 {# Version #}
 {% call C.ui_td(type='version') %}V{{ sample.version or 1 }}{% endcall %}
+{# Remark #}
+{{ C.ui_td(text=sample.remark or '-', type='text') }}
 {# Actions #}
 {% call C.ui_td(type='action') %}
 {{ C.ui_row_actions(

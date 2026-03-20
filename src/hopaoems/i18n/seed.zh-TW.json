@@ -35,6 +35,7 @@
     "common.machine_status": "tt_dictionary",
     "common.mirror_print": "tt_dictionary",
     "common.net_weight": "tt_dictionary",
+    "common.new_chat": "新對話",
     "common.next": "hardcoded",
     "common.no": "hardcoded",
     "common.no_data": "hardcoded",
@@ -1033,5 +1034,11 @@
   "fabric.intake.import.error.missing_roll_no": "第 {row} 行：疋號不可空白。",
   "fabric.intake.import.error.invalid_weight": "第 {row} 行：克重必須為正數。",
   "fabric.intake.import.error.duplicate_roll_no": "第 {row} 行：疋號「{value}」重複。",
-  "common.apply": "套用"
+  "common.apply": "套用",
+  "ai.chat.title": "AI 助理",
+  "ai.chat.placeholder": "輸入問題或指令...",
+  "ai.chat.upload_image": "上傳圖片",
+  "ai.chat.clear_image": "清除圖片",
+  "ai.ocr.upload": "上傳圖片識別",
+  "ai.error.model_not_ready": "AI 模型尚未就緒，請聯繫管理員"
 }

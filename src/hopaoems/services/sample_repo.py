@@ -77,13 +77,14 @@ def create_sample(sample_no, title, fabric_no, sales_code=None, version=None,
          printing_environment, printing_file_name)
     )
 
-def update_sample(id, title=None, fabric_no=None, date_received=None, sampled_date=None, 
+def update_sample(id, sample_no=None, title=None, fabric_no=None, date_received=None, sampled_date=None, 
                   version=None, printing_environment=None, printing_file_name=None, 
                   remark=None, preview_path=None):
     _ensure_schema()
     # Only updates editable fields
     return execute_db(
         '''UPDATE samples SET 
+            sample_no = COALESCE(?, sample_no),
             title = COALESCE(?, title),
             fabric_no = COALESCE(?, fabric_no),
             date_received = COALESCE(?, date_received),
@@ -94,8 +95,39 @@ def update_sample(id, title=None, fabric_no=None, date_received=None, sampled_da
             remark = COALESCE(?, remark),
             preview_path = COALESCE(?, preview_path)
            WHERE id = ?''',
-        (title, fabric_no, date_received, sampled_date, version, printing_environment, printing_file_name, remark, preview_path, id)
+        (sample_no, title, fabric_no, date_received, sampled_date, version, printing_environment, printing_file_name, remark, preview_path, id)
     )
+
+def update_sample_by_ai(query, title=None, fabric_no=None, remark=None):
+    """
+    Finds a sample by its sample_no or title exact/fuzzy match, and updates it.
+    If multiple fuzzy matches are found, it returns the list for the AI to ask the user.
+    """
+    # 1. Exact match by sample_no
+    res = query_db('SELECT id, sample_no, title FROM samples WHERE sample_no = ?', (query,), one=True)
+    if not res:
+        # 2. Exact match by title
+        res = query_db('SELECT id, sample_no, title FROM samples WHERE title = ?', (query,), one=True)
+    
+    if res:
+        # One exact match found, proceed to update
+        update_sample(res['id'], title=title, fabric_no=fabric_no, remark=remark)
+        return {"status": "success", "title": res['title'], "id": res['id']}
+
+    # 3. Fuzzy match by title
+    matches = query_db('SELECT id, sample_no, title FROM samples WHERE title LIKE ?', (f"%{query}%",), one=False)
+    
+    if not matches:
+        raise ValueError(f"找不到符合條件的樣品: {query}")
+        
+    if len(matches) > 1:
+        # Multiple candidates found, return them for AI to clarify
+        return {"status": "ambiguous", "matches": matches}
+
+    # Exactly one fuzzy match found
+    res = matches[0]
+    update_sample(res['id'], title=title, fabric_no=fabric_no, remark=remark)
+    return {"status": "success", "title": res['title'], "id": res['id']}
 
 def list_color_maps(sample_id):
     return query_db('SELECT * FROM sample_color_map WHERE sample_id = ? ORDER BY created_at', (sample_id,))

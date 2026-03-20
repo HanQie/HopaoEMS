@@ -224,6 +224,18 @@
       "methods": [
         "GET"
       ]
+    },
+    {
+      "endpoint": "api_ai.chat",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "endpoint": "api_ai.ocr",
+      "methods": [
+        "POST"
+      ]
     }
   ],
   "forbidden_hooks": [

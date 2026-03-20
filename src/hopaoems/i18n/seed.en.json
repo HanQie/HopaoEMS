@@ -35,6 +35,7 @@
     "common.machine_status": "tt_dictionary",
     "common.mirror_print": "tt_dictionary",
     "common.net_weight": "tt_dictionary",
+    "common.new_chat": "New Chat",
     "common.next": "hardcoded",
     "common.no": "hardcoded",
     "common.no_data": "hardcoded",
@@ -1031,5 +1032,11 @@
   "fabric.intake.import.error.missing_roll_no": "Row {row}: roll_no is required.",
   "fabric.intake.import.error.invalid_weight": "Row {row}: weight_kg must be a positive number.",
   "fabric.intake.import.error.duplicate_roll_no": "Row {row}: Duplicate roll_no '{value}'.",
-  "common.apply": "Apply"
+  "common.apply": "Apply",
+  "ai.chat.title": "AI Assistant",
+  "ai.chat.placeholder": "Ask a question or command...",
+  "ai.chat.upload_image": "Upload Image",
+  "ai.chat.clear_image": "Clear Image",
+  "ai.ocr.upload": "Upload Image for OCR",
+  "ai.error.model_not_ready": "AI model not ready, please contact administrator"
 }

@@ -480,6 +480,34 @@
       ],
       "rule": "/production/log/<int:id>/undo-wash",
       "endpoint": "ui_production.production_log_undo_wash"
+    },
+    {
+      "methods": [
+        "POST"
+      ],
+      "rule": "/api/ai/chat",
+      "endpoint": "api_ai.chat"
+    },
+    {
+      "methods": [
+        "POST"
+      ],
+      "rule": "/api/ai/ocr",
+      "endpoint": "api_ai.ocr"
+    },
+    {
+      "methods": [
+        "POST"
+      ],
+      "rule": "/api/ai/image-ingest",
+      "endpoint": "api_ai.image_ingest"
+    },
+    {
+      "methods": [
+        "POST"
+      ],
+      "rule": "/api/ai/image-search",
+      "endpoint": "api_ai.image_search"
     }
   ],
   "ignore_rules_prefix": [

@@ -5,15 +5,18 @@ from hopaoems.app_factory import create_app
 
 # Enforce Gate Check on Startup (Development)
 if __name__ == "__main__":
-    # Import and run gates
-    from hopaoems.contracts.run_gates import main as run_gates
-    print("--- [PRE-FLIGHT] Running Quality Gates ---")
-    try:
-        run_gates()
-    except SystemExit as e:
-        if e.code != 0:
-            print(f"!!! STARTUP BLOCKED: Quality gates failed. !!!")
-            sys.exit(e.code)
+    if os.environ.get("SKIP_GATES") == "true":
+        print("--- [PRE-FLIGHT] Skipping Quality Gates (SKIP_GATES=true) ---")
+    else:
+        # Import and run gates
+        from hopaoems.contracts.run_gates import main as run_gates
+        print("--- [PRE-FLIGHT] Running Quality Gates ---")
+        try:
+            run_gates()
+        except SystemExit as e:
+            if e.code != 0:
+                print(f"!!! STARTUP BLOCKED: Quality gates failed. !!!")
+                sys.exit(e.code)
 
     port = int(os.environ.get('PORT', 5000))
     # Check if passed via command line

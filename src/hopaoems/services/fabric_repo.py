@@ -160,6 +160,33 @@ def delete_cylinder_cascade(cylinder_id):
     execute_db('DELETE FROM rolls WHERE cylinder_id = ?', (cylinder_id,))
     execute_db('DELETE FROM cylinders WHERE id = ?', (cylinder_id,))
 
+def delete_fabric_cascade(fabric_code):
+    from .db import query_db, execute_db
+    fabric = get_fabric_by_code(fabric_code)
+    if not fabric:
+        raise ValueError(f"Fabric code {fabric_code} not found")
+        
+    result = query_db('''
+        SELECT COUNT(pl.id) as count
+        FROM production_logs pl
+        JOIN rolls r ON pl.roll_id = r.id
+        JOIN cylinders c ON r.cylinder_id = c.id
+        WHERE c.fabric_id = ?
+    ''', (fabric['id'],), one=True)
+    if result['count'] > 0:
+        raise ValueError("Cannot delete fabric: Rolls have been used in production.")
+        
+    execute_db('''
+        DELETE FROM roll_history WHERE roll_id IN (
+            SELECT r.id FROM rolls r
+            JOIN cylinders c ON r.cylinder_id = c.id
+            WHERE c.fabric_id = ?
+        )
+    ''', (fabric['id'],))
+    execute_db('DELETE FROM rolls WHERE cylinder_id IN (SELECT id FROM cylinders WHERE fabric_id = ?)', (fabric['id'],))
+    execute_db('DELETE FROM cylinders WHERE fabric_id = ?', (fabric['id'],))
+    execute_db('DELETE FROM fabrics WHERE id = ?', (fabric['id'],))
+
 def search_in_stock_rolls(query=None):
     from .db import query_db
     sql = '''

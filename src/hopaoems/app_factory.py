@@ -80,7 +80,7 @@ def create_app(test_config=None):
     app.config.from_mapping(
         SECRET_KEY='dev',
         DATABASE=os.path.join(app.instance_path, 'hopaoems.sqlite'),
-        MAX_CONTENT_LENGTH=30 * 1024 * 1024, # 30MB limit
+        MAX_CONTENT_LENGTH=None, # 無上限 (No limit)
     )
 
     if test_config is None:
@@ -103,6 +103,10 @@ def create_app(test_config=None):
         schema_migrations.init_schema()
     i18n.init_app(app)
 
+    # Initialize AI Engine (lazy-fail: logs warning if model path not set)
+    from .ai_engine import init_ai_engine
+    init_ai_engine(app)
+
     # D) Global User Loader
     app.before_request(auth_service.load_logged_in_user)
 
@@ -123,6 +127,8 @@ def create_app(test_config=None):
     app.register_blueprint(ui_production.bp)
     app.register_blueprint(ui_wash.bp)
     app.register_blueprint(ui_settings.bp)
+    from .blueprints import api_ai
+    app.register_blueprint(api_ai.bp)
 
     # E) Context Processors
     @app.context_processor

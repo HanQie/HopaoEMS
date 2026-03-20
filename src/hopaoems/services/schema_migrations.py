@@ -363,6 +363,20 @@ def init_schema():
         )
     ''')
 
+    # 17. Image Vectors (AI Phase 3: 圖片入庫 + 以圖搜圖)
+    db.execute_db('''
+        CREATE TABLE IF NOT EXISTS image_vectors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            image_path TEXT NOT NULL,
+            entity_type TEXT,
+            entity_id INTEGER,
+            ocr_data TEXT,
+            embedding BLOB NOT NULL,
+            embedding_dim INTEGER NOT NULL,
+            created_at DATETIME DEFAULT (datetime('now'))
+        )
+    ''')
+
     db.commit()
 
     # 15. Role Consolidation Migration

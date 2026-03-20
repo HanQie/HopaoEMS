@@ -1,6 +1,7 @@
 
 import json
 import os
+# Force reload to refresh i18n cache
 from flask import request, current_app, session
 
 def normalize_locale(lang):
