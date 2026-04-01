@@ -31,6 +31,83 @@ def _get_db_path() -> str:
     return current_app.config["DATABASE"]
 
 
+def _parse_current_entity(raw) -> dict:
+    if not raw:
+        return {}
+    if isinstance(raw, dict):
+        data = raw
+    else:
+        try:
+            import json
+            data = json.loads(raw)
+        except Exception:
+            return {}
+    if not isinstance(data, dict):
+        return {}
+    entity_type = str(data.get("type") or "").strip()
+    entity_id = data.get("id")
+    try:
+        entity_id = int(entity_id) if entity_id is not None and str(entity_id).strip() else None
+    except Exception:
+        entity_id = None
+    return {
+        "type": entity_type,
+        "id": entity_id,
+        "sample_no": str(data.get("sample_no") or "").strip(),
+        "title": str(data.get("title") or "").strip(),
+    }
+
+
+def _parse_field_manifest(raw) -> dict:
+    if not raw:
+        return {}
+    if isinstance(raw, dict):
+        data = raw
+    else:
+        try:
+            import json
+            data = json.loads(raw)
+        except Exception:
+            return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _sanitize_conversation_id(raw: str | None) -> str:
+    import re
+
+    value = str(raw or "").strip()
+    if not value:
+        return "default"
+    cleaned = re.sub(r"[^a-zA-Z0-9_-]", "", value)
+    return cleaned[:80] or "default"
+
+
+def _build_temp_dir(username: str, conversation_id: str) -> str:
+    return os.path.join(
+        current_app.root_path,
+        "static",
+        "uploads",
+        "temp_ai",
+        username,
+        conversation_id,
+    )
+
+
+def _text_requests_image_context(text: str) -> bool:
+    """
+    僅在用戶明確談到圖片/辨識/搜尋圖片時，才注入微庫提示。
+    避免純文字任務被殘留圖片誤導到 OCR 流程。
+    """
+    lowered = (text or "").strip().lower()
+    if not lowered:
+        return False
+    keywords = (
+        "圖", "圖片", "照片", "影像", "樣品照", "這張", "那張", "上傳",
+        "ocr", "辨識", "識別", "擷取", "搜圖", "以圖搜圖", "image", "photo", "picture",
+    )
+    return any(token in lowered for token in keywords)
+
+
 # ---------------------------------------------------------------------------
 # POST /api/ai/chat
 # ---------------------------------------------------------------------------
@@ -63,19 +140,28 @@ def chat():
     # 從 JSON 或 form-data 中提取參數
     image_bytes = None
     history = []
+    current_entity = {}
+    field_manifest = {}
     username = g.user["username"] if g.user else "operator"
+    conversation_id = "default"
+    routing_text = ""
     
     # 用於儲存與讀取最後一次上傳的圖片（跨回合記憶）
     import os
+    import time
     from flask import current_app
-    temp_dir = os.path.join(current_app.root_path, "static", "uploads", "temp_ai")
-    os.makedirs(temp_dir, exist_ok=True)
-    last_img_path = os.path.join(temp_dir, f"last_chat_image_{username}.jpg")
     
+    # 建立該使用者的專屬微庫暫存目錄
     if request.content_type and "multipart" in request.content_type:
         text = (request.form.get("text") or "").strip()
+        routing_text = text
         lang = request.form.get("lang", "zh")
         hist_raw = request.form.get("history")
+        current_entity = _parse_current_entity(request.form.get("current_entity"))
+        field_manifest = _parse_field_manifest(request.form.get("field_manifest"))
+        conversation_id = _sanitize_conversation_id(request.form.get("conversation_id"))
+        temp_dir = _build_temp_dir(username, conversation_id)
+        os.makedirs(temp_dir, exist_ok=True)
         if hist_raw:
             try:
                 import json
@@ -87,31 +173,43 @@ def chat():
             img_file = request.files["image"]
             if img_file and img_file.filename:
                 image_bytes = img_file.read()
-                # 存入備份，供下一回合使用
-                with open(last_img_path, "wb") as f:
+                
+                # 存入微庫暫存（按時間戳命名）
+                new_img_filename = f"img_{int(time.time())}.jpg"
+                new_img_path = os.path.join(temp_dir, new_img_filename)
+                with open(new_img_path, "wb") as f:
                     f.write(image_bytes)
+                    
+                # 清理微庫，只保留最近 3 張
+                try:
+                    existing_files = [f for f in os.listdir(temp_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+                    if len(existing_files) > 3:
+                        existing_files.sort(key=lambda x: os.path.getmtime(os.path.join(temp_dir, x)))
+                        for old_file in existing_files[:-3]:
+                            os.remove(os.path.join(temp_dir, old_file))
+                except Exception as e:
+                    current_app.logger.warning(f"[AI Chat] 清理微庫失敗：{e}")
 
-                # [新增] 立即嘗試 OCR 提取顏色表（預處理）
+                # 按需做輕量圖片前處理，避免所有圖片都先跑一次 VL
                 try:
                     from ..ai_engine import ai_service
-                    ocr_prompt = "請識別圖片中的顏色表，列出所有的 RGB 與對應的 LAB 或 YMCK。格式儘量整齊。"
-                    ocr_raw = ai_service.call_ollama(
-                        prompt=ocr_prompt,
-                        images=[image_bytes],
-                        temperature=0.0,
-                        max_tokens=1024
-                    )
-                    if ocr_raw:
-                        # 放在 text 最前面，讓主腦第一時間看到
-                        text = f"[系統自動解析當前圖片內容：\n{ocr_raw}\n]\n\n" + text
-                        current_app.logger.info("[AI Chat] 立即 OCR 成功，已併入文字 context")
-                except Exception as ocr_err:
-                    current_app.logger.warning(f"[AI Chat] 立即 OCR 失敗（跳過）：{ocr_err}")
+                    image_context = ai_service.build_chat_image_context(text, image_bytes)
+                    if image_context:
+                        text = image_context + text
+                        current_app.logger.info("[AI Chat] 圖片前處理成功，已併入文字 context")
+                except Exception as image_err:
+                    current_app.logger.warning(f"[AI Chat] 圖片前處理失敗（跳過）：{image_err}")
     else:
         data = request.get_json(silent=True) or {}
         text = str(data.get("text") or "").strip()
+        routing_text = text
         lang = data.get("lang", "zh")
         history = data.get("history", [])
+        current_entity = _parse_current_entity(data.get("current_entity"))
+        field_manifest = _parse_field_manifest(data.get("field_manifest"))
+        conversation_id = _sanitize_conversation_id(data.get("conversation_id"))
+        temp_dir = _build_temp_dir(username, conversation_id)
+        os.makedirs(temp_dir, exist_ok=True)
 
     if not text and not image_bytes:
         return jsonify({
@@ -123,41 +221,48 @@ def chat():
     if not text and image_bytes:
         text = "[用戶發送了一張圖片，請根據圖片內容與 OCR 數據判斷意圖。如果是表格則嘗試記錄資料，如果是樣品照則嘗試查找樣品。]"
 
-    # 如果當前沒上傳圖片，但有歷史紀錄，嘗試從備份讀取（實現跨回合記憶）
-    if not image_bytes and history and os.path.exists(last_img_path):
-        vision_keywords = ["圖", "照片", "表", "圖片", "這裡面", "picture", "image", "table", "chart"]
-        if any(k in text for k in vision_keywords) or "就在這" in text:
-            with open(last_img_path, "rb") as f:
-                image_bytes = f.read()
-            current_app.logger.info(f"[AI Chat] 從備份載入圖片 context (user: {username})")
-            
-            try:
-                from ..ai_engine import ai_service
-                # 使用測試成功的簡單 Prompt
-                ocr_prompt = "請識別圖片中的顏色表，列出所有的 RGB 與對應的 LAB 或 YMCK。只要回傳資料內容即可。"
-                ocr_raw = ai_service.call_ollama(
-                    prompt=ocr_prompt,
-                    images=[image_bytes],
-                    temperature=0.0,
-                    max_tokens=1024
-                )
-                if ocr_raw:
-                    # 注入到 text 中，放在最前面以策安全
-                    text = f"[系統偵測到圖片內容並自動解析如下，請優先參考：\n{ocr_raw}\n]\n\n" + text
-                    current_app.logger.info("[AI Chat] 立即 OCR 成功，已併入文字 context")
-            except Exception as ocr_err:
-                current_app.logger.warning(f"[AI Chat] 立即 OCR 失敗：{ocr_err}")
+    # -- 微庫狀態提示注入 --
+    # 只有當前回合真的涉及圖片時，才把微庫資訊附加到文字，避免污染純文字任務。
+    try:
+        should_attach_image_context = bool(image_bytes) or _text_requests_image_context(text)
+        if should_attach_image_context:
+            available_images = []
+            if os.path.isdir(temp_dir):
+                files = [f for f in os.listdir(temp_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+                files.sort(key=lambda x: os.path.getmtime(os.path.join(temp_dir, x)), reverse=True)
+                for f in files:
+                    mtime = os.path.getmtime(os.path.join(temp_dir, f))
+                    age_minutes = int((time.time() - mtime) / 60)
+                    if age_minutes == 0:
+                        age_str = "剛剛"
+                    elif age_minutes < 60:
+                        age_str = f"{age_minutes} 分鐘前"
+                    else:
+                        age_str = f"{age_minutes // 60} 小時前"
+                    available_images.append(f"{f} ({age_str})")
+
+            if available_images:
+                images_list_str = "、".join(available_images)
+                micro_lib_hint = f"\n\n[系統提示：目前『微庫』暫存區內有以下圖片：{images_list_str}。如果需要提取圖片資料，可在視覺工具中使用對應的 image_id。]"
+                text += micro_lib_hint
+                current_app.logger.info(f"[AI Chat] 已注入微庫 Context: {images_list_str}")
+    except Exception as e:
+        current_app.logger.warning(f"[AI Chat] 注入微庫 Context 失敗：{e}")
 
     try:
         from ..ai_engine import intent_dispatcher
         result = intent_dispatcher.dispatch(
             text=text,
+            route_text=routing_text,
             lang=lang,
             db_path=_get_db_path(),
             processor=processor,
             username=username,
             image_bytes=image_bytes,
             history=history,
+            current_entity=current_entity,
+            field_manifest=field_manifest,
+            conversation_id=conversation_id,
         )
         return jsonify(result)
     except Exception as exc:

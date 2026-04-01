@@ -31,40 +31,19 @@ MAX_ITERATIONS = 5
 # Agent System Prompt
 # ---------------------------------------------------------------------------
 AGENT_SYSTEM_PROMPT = """\
-你是 HopaoEMS 工廠管理系統的 AI 助理。你可以使用以下工具來協助用戶：
+你是 HopaoEMS 工廠管理系統的 AI 助理，具備「架構感知 (Schema-Aware)」能力。
 
-1. **query_database** — 查詢庫存、訂單、生產記錄等資料庫資訊
-2. **stock_in_full** — 完整入庫登記（布號 + 缸號 + 捲料列表全部齊備時）
-3. **register_fabric_only** — 即 partial_stock_in，僅建立或註冊布號主檔（當用戶只想新增布號、或是其他入庫資訊之後再補時使用）
-4. **log_production** — 登記生產記錄
-5. **lookup_fabric** — 查找布號是否已存在
-6. **lookup_roll** — 搜索在庫的捲料
-7. **ask_user** — 向用戶反問缺少的資訊
-8. **create_sample** — 建立新樣品記錄
-9. **search_sample_by_image** — 用戶發送圖片時，找出系統中最相似的樣品
-10. **list_samples** — 搜索或列出樣品
-11. **edit_sample** — 修改樣品的資料（如修改標題、備註、關聯布號等）
-12. **delete_fabric** — 徹底刪除布號及其所有缸號與捲料紀錄
-13. **batch_record_color_corrections** — 當用戶提供顏色表格時，批量記錄顏色校正數據（如 RGB -> LAB/YMCK）
-14. **extract_color_correction_data** — 從用戶上傳的圖片中提取顏色換色表格數據（當你自己看不見圖中內容時調用）
-
-⚠️ 重要規則：
-- **批量入庫與自動編號**：若用戶連續輸入了 N 個重量數值，表示這是批量入庫。請務必在 `rolls` 陣列中產生 N 個對應的物件。關於每一項的「捲號」：如果用戶有用連寫數字（如 "12345"）對應 N 個重量，請將其拆解，理解為捲號分別是 "1", "2", "3", "4", "5"。如果用戶懶得打捲號，請你**自動依序命名為 "1", "2", "3", "4", ...** 直到 N。**絕對不可以把重量數值本身當作捲號**！
-- **意圖不明確認**：如果用戶提供的入庫資料（如疋數與重量的對應關係）存在模糊、不一致，或者你不確定是否該將連寫數字拆解時，**請先中斷操作並調用 `ask_user` 工具或者直接回覆訊息詢問用戶**，同時提供明確的 A/B 選項供用戶選擇（例如：「請問 12345 是指 1 筆捲號叫做 12345？還是指 5 筆分別叫作 1, 2, 3, 4, 5？ (A) 1筆 (B) 5筆」）。
-- **長度估算**：系統會根據克重自動估算長度。**禁止主動向用戶詢問長度**（除非用戶主動提供）。如果用戶未提供長度，請在調用參數中省略 `length_m` 或明確設為 0。
-- **顏色換色數據提取與圖片記憶**：用戶上傳圖片後，系統會自動嘗試 OCR 並將結果放入 `[系統偵測到圖片內容並自動解析如下：... ]`。
-  - **優先使用現成數據**：如果你在 context 中看到這些括號內的數據，請**直接提取並調用 `batch_record_color_corrections`**。如果數據看起來像顏色表（RGB 對應 LAB/YMCK），不要再詢問用戶，除非數據完全不可讀。
-  - **手動調用視覺模型**：如果 context 中沒有數據、數據不全、或用戶提到「看這張圖」，你仍應調用 `extract_color_correction_data` 工具。
-  - **流程**：(優先) Context 數據 / (備選) `extract_color_correction_data` -> 調用 `batch_record_color_corrections`。
-  - **輸入層 (Input)**：通常標示為 RGB。
-  - **輸出層 (Output)**：標示為 LAB、YMCK 或其他。如果是 YMCKBHFm，請將 `target_mode` 設為 "YMCKBHFm" 並將 8 位數值放入 `target_note`。
-- **剪貼簿支援**：用戶現在可以 CTRL+V 貼上截圖，這會與圖片上傳行為一致，你應主動 search 相似樣品。
-- **未知需求 / 能力外工作**：如果用戶要求了沒有適合上述工具的操作（例如刪除訂單、刪除紀錄、無法判斷的行為等），請明確且誠實地告訴用戶你目前無法做到或沒有對應工具，**絕對不要在沒有調用適當工具的情況下捏造成功的回覆**。
-- 禁止猜測用戶沒有提供的數據（如重量）。
-- 如果用戶提供了足夠資訊做完整入庫（布號 + 缸號 + 捲數及重量），調用 `stock_in_full`。
-- **當用戶發送圖片時，應主動調用 search_sample_by_image** 來查找相似樣品。
-- 使用繁體中文或越南語回覆（根據用戶語言）。
-- 回覆要簡潔、專業。
+核心原則：
+1. 請先詳閱提供的資料庫 Schema，瞭解有哪些資料表與欄位及其 NOT NULL 約束。
+2. 嚴格採用 CQRS：所有查詢一律使用 `universal_query_engine`；所有狀態變更一律使用 `universal_data_entry`。
+3. 若用戶要求新增或修改資料，請使用 `universal_data_entry` 並傳入 `action="upsert"`。
+4. 若用戶要求刪除明確的資料，請使用 `universal_data_entry` 並傳入 `action="delete"` 與 `conditions`。
+5. 【複合刪除或批量操作】（例如「刪除重複項」、「刪除某條件下的全部」）：請先使用 `universal_query_engine` 找出要刪除的具體 `id` 清單，再使用 `universal_data_entry` 傳入 `action="delete"` 與 `{"id": [對應的ID]}` 進行刪除，切勿因為不知道 ID 就直接放棄並詢問用戶。
+5.1 若需求是樣品顏色校正資料的「重複去重」，例如「刪除重複原顏色」「同色只留一筆」，必須使用 `deduplicate_color_corrections`，禁止直接刪除 `sample_color_map` 全部資料。
+6. 若用戶上傳了單據或圖片，需要 OCR/欄位擷取時請使用 `multimodal_processor` 並傳入 `action="extract"`；若要以圖找圖，請使用 `multimodal_processor` 並傳入 `action="search"`。
+7. 若發現執行寫入時仍缺少關鍵必填資訊，請調用 `ask_user` 向用戶索取。
+8. 【任務完成反饋】：當操作成功時，請自主生成『友善的成功反饋』，確保用戶清楚知道操作已完成。
+9. 你可以在 `<think>...</think>` 中做內部規劃，用來拆解複合任務、決定查詢與寫入順序、或規劃多模態流程；最終對外回覆必須乾淨，工具參數必須精確。
 """
 
 
@@ -81,18 +60,29 @@ class AgentRunner:
         username: str = "operator",
         image_bytes: bytes | None = None,
         history: list[dict[str, str]] | None = None,
+        current_entity: dict[str, Any] | None = None,
+        field_manifest: dict[str, Any] | None = None,
+        conversation_id: str = "default",
     ):
         self.processor = processor
         self.ctx = ToolContext(
             db_path=db_path,
             lang=lang,
             username=username,
+            conversation_id=conversation_id,
             processor=processor,
             image_bytes=image_bytes,
+            current_entity=current_entity,
+            field_manifest=field_manifest,
         )
         self.lang = lang
         self.has_image = image_bytes is not None
         self.history = history or []
+        self.current_entity = current_entity or {}
+        self.field_manifest = field_manifest or {}
+        self.conversation_id = conversation_id
+        self.accumulated_thinking = []
+        self.tool_trace = []
 
     def run(self, user_text: str) -> dict[str, Any]:
         """
@@ -101,12 +91,17 @@ class AgentRunner:
             "status": "ok" | "need_info" | "ready" | "partial_done" | "error",
             "intent": "query" | "stock_in" | "production_log" | "agent" | "unknown",
             "reply": "...",
+            "thinking_process": "...",
             "params": {...}   // optional
         }
         """
+        from .ai_service import get_db_schema
+        schema_sql = get_db_schema(self.ctx.db_path)
+        system_content = f"{AGENT_SYSTEM_PROMPT}\n\n【動態 Schema】\n```sql\n{schema_sql}\n```\n請根據以上 Schema 決定寫入時需要提供的最小欄位。\n"
+
         # 建立初始訊息列表
         messages = [
-            {"role": "system", "content": AGENT_SYSTEM_PROMPT},
+            {"role": "system", "content": system_content},
         ]
 
         # 注入歷史紀錄 (對應 Ollama role: user, assistant)
@@ -128,7 +123,7 @@ class AgentRunner:
                     messages=messages,
                     tools=TOOL_SCHEMAS,
                     max_tokens=2048,
-                    temperature=0.1,
+                    temperature=0.4,
                 )
             except Exception as e:
                 logger.error(f"[Agent] Ollama 呼叫失敗: {e}", exc_info=True)
@@ -147,8 +142,12 @@ class AgentRunner:
             # 沒有 tool_calls → 模型選擇直接回覆
             if not tool_calls:
                 logger.info(f"[Agent] 模型直接回覆（無 tool_calls）")
-                # 清理 <think> 標籤
-                from .ai_service import _strip_think_tags
+                # 提取並清理 <think> 標籤
+                from .ai_service import _strip_think_tags, _extract_think_tags, summarize_reasoning_debug
+                think_block = _extract_think_tags(content)
+                if think_block:
+                    self.accumulated_thinking.append(summarize_reasoning_debug(think_block))
+                    
                 cleaned = _strip_think_tags(content)
                 
                 # 如果有截取到一些標籤像 portun </tool_call>，做額外清理
@@ -171,13 +170,18 @@ class AgentRunner:
                 tool_args = tc.function.arguments
 
                 # 追蹤意圖
-                detected_intent = self._infer_intent(tool_name, detected_intent)
+                detected_intent = self._infer_intent(tool_name, tool_args, detected_intent)
 
                 logger.info(f"[Agent] 調用 Tool: {tool_name}")
 
                 # 執行 Tool
                 result = execute_tool(tool_name, tool_args, self.ctx)
                 last_tool_result = result
+                self.tool_trace.append({
+                    "tool": tool_name,
+                    "args": tool_args,
+                    "result": result,
+                })
 
                 # 特殊處理：ask_user 直接回傳
                 if tool_name == "ask_user":
@@ -222,12 +226,8 @@ class AgentRunner:
     @staticmethod
     def _parse_raw_tool_calls(content: str) -> list[Any]:
         """當 Ollama SDK 無法解析時，嘗試用正則從文字中提取 tool call JSON。"""
-        import re
         import json
-        
-        # 尋找類似 {"name": "...", "arguments": {...}} 的 JSON 結構
-        pattern = re.compile(r'\{\s*"name"\s*:\s*"[^"]+"\s*,\s*"arguments"\s*:\s*\{.*?\}\s*\}', re.DOTALL)
-        matches = pattern.finditer(content)
+        import logging
         
         class MockFunction:
             def __init__(self, name, arguments):
@@ -239,44 +239,100 @@ class AgentRunner:
                 self.function = function
                 
         parsed_calls = []
-        for m in matches:
+        content = content.strip()
+        start = content.find('{')
+        end = content.rfind('}')
+        if start != -1 and end != -1:
+            raw = content[start:end+1]
             try:
-                data = json.loads(m.group(0))
-                name = data.get("name")
-                args = data.get("arguments", {})
-                if name:
-                    parsed_calls.append(MockToolCall(MockFunction(name, args)))
+                data = json.loads(raw)
+                if isinstance(data, dict) and "name" in data and "arguments" in data:
+                    parsed_calls.append(MockToolCall(MockFunction(data["name"], data["arguments"])))
+                elif isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict) and "name" in item and "arguments" in item:
+                            parsed_calls.append(MockToolCall(MockFunction(item["name"], item["arguments"])))
             except Exception as e:
-                logger.warning(f"[Agent] 無法解析匹配到的 raw tool_call JSON: {e}")
+                logging.getLogger(__name__).warning(f"[Agent] 無法解析 raw tool_call JSON: {e}\nRaw:{raw}")
                 
         return parsed_calls
 
     @staticmethod
-    def _infer_intent(tool_name: str, current: str) -> str:
-        """從 Tool 名稱推斷意圖。"""
-        mapping = {
-            "query_database": "query",
-            "stock_in_full": "stock_in",
-            "register_fabric_only": "stock_in",
-            "log_production": "production_log",
-            "lookup_fabric": "query",
-            "lookup_roll": "query",
-            "ask_user": current,  # 保留原意圖
-            "create_sample": "sample",
-            "search_sample_by_image": "sample_search",
-            "list_samples": "query",
-        }
-        return mapping.get(tool_name, current)
+    def _infer_intent(tool_name: str, tool_args: str | dict, current: str) -> str:
+        """從 Tool 名稱與參數推斷意圖。"""
+        if isinstance(tool_args, str):
+            import json
+            try:
+                args = json.loads(tool_args)
+            except:
+                args = {}
+        else:
+            args = tool_args or {}
+
+        if tool_name == "universal_query_engine":
+            return "query"
+        elif tool_name == "universal_data_entry" or tool_name == "universal_delete_entry":
+            entity = args.get("entity_type", "")
+            if "fabric" in entity or "stock" in entity:
+                return "stock_in"
+            elif "production" in entity:
+                return "production_log"
+            elif "sample" in entity:
+                return "sample"
+            return current
+        elif tool_name in ("multimodal_extractor", "multimodal_processor", "deduplicate_color_corrections"):
+            return "sample"
+        return current
 
     def _build_user_message(self, user_text: str) -> str:
         """構建用戶訊息，包含圖片上下文提示。"""
-        if self.has_image:
-            return (
+        has_context_image = self.has_image
+        if has_context_image:
+            text = (
                 f"{user_text}\n\n"
-                "[系統提示：用戶同時上傳了一張圖片。"
-                "請調用 search_sample_by_image 工具來查找相似樣品。]"
+                "[系統提示：用戶同時上傳了一張圖片或指定了微庫圖片。"
+                "請視任務需要調用 `multimodal_processor` 進行圖片擷取或以圖搜圖。]"
             )
-        return user_text
+        else:
+            text = user_text
+
+        if self.current_entity.get("type") == "sample":
+            text += (
+                "\n\n"
+                f"[系統提示：當前頁面 sample id={self.current_entity.get('id')}, "
+                f"sample_no={self.current_entity.get('sample_no', '')}, "
+                f"title={self.current_entity.get('title', '')}。"
+                "若用戶說『這個』『這張』『刪除重複的』『幫我填入』，優先視為針對這筆 sample。]"
+            )
+
+        manifest = self.field_manifest or {}
+        fields = manifest.get("fields") or []
+        groups = manifest.get("groups") or []
+        page_type = str(manifest.get("page_type") or "").strip()
+        if page_type or fields or groups:
+            field_parts = []
+            for field in fields[:12]:
+                name = str(field.get("name") or "").strip()
+                label = str(field.get("label") or "").strip()
+                aliases = [str(alias).strip() for alias in (field.get("aliases") or []) if str(alias).strip()]
+                alias_text = f" aliases={','.join(aliases[:4])}" if aliases else ""
+                if name:
+                    field_parts.append(f"{name}({label or name}{alias_text})")
+            group_parts = []
+            for group in groups[:6]:
+                group_name = str(group.get("name") or "").strip()
+                group_kind = str(group.get("kind") or "").strip()
+                if group_name:
+                    group_parts.append(f"{group_name}:{group_kind or 'group'}")
+            text += (
+                "\n\n"
+                f"[系統提示：當前頁面 page_type={page_type or 'unknown'}。"
+                f"可編輯欄位: {'; '.join(field_parts) if field_parts else '無'}。"
+                f"欄位群組: {'; '.join(group_parts) if group_parts else '無'}。"
+                "若用戶要求『填入』『補充』『更新本頁欄位』，優先針對這些欄位產生最小必要更新；"
+                "若已鎖定 current_entity，請避免再要求無關的必填欄位。]"
+            )
+        return text
 
     def _build_response(
         self,
@@ -293,6 +349,17 @@ class AgentRunner:
         }
         if params:
             resp["params"] = params
+
+        # 注入可安全展示的 debug reasoning 摘要
+        if hasattr(self, 'accumulated_thinking') and self.accumulated_thinking:
+            valid = [t for t in self.accumulated_thinking if t.strip()]
+            if valid:
+                summary = "\n\n---\n\n".join(valid)
+                resp["reasoning_summary"] = summary
+                resp["thinking_process"] = summary
+        if self.tool_trace:
+            resp["tool_trace"] = self.tool_trace
+
         return resp
 
     def _error_response(self, detail: str = "") -> dict[str, Any]:

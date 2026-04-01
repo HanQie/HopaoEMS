@@ -12,7 +12,8 @@ ai_engine package (Agent Architecture + Ollama)
 
 模型策略：
   - text_model（決策大腦）：qwen2.5:7b — 用於 Agent Tool Calling
-  - vl_model（視覺模型）：qwen3-vl:4b — 用於圖片 OCR
+  - vl_model（視覺模型）：qwen3-vl:4b — 用於圖片理解 fallback
+  - ocr_model（輕量視覺）：qwen3-vl:4b — 用於圖片預處理 / OCR first
   - 啟動時自動檢查並下載缺失的模型（支持斷點續傳）
 """
 
@@ -21,6 +22,7 @@ from __future__ import annotations
 import logging
 import sys
 import time
+import threading
 from typing import TYPE_CHECKING
 
 # 設定 AI 引擎套件的日誌等級為 INFO，確保控制台可見
@@ -136,6 +138,55 @@ def _ensure_model_available(client, model_name: str) -> bool:
         return False
 
 
+def _pick_available_model(
+    requested_model: str,
+    available_models: list[str],
+    fallback_candidates: list[str],
+) -> str:
+    """優先使用請求模型；若不存在，退回到已安裝的候選模型。"""
+    for name in available_models:
+        if name == requested_model:
+            return name
+
+    requested_base = requested_model.split(":")[0]
+    for name in available_models:
+        if name.startswith(requested_base + ":"):
+            return name
+
+    for candidate in fallback_candidates:
+        for name in available_models:
+            if name == candidate:
+                return name
+        candidate_base = candidate.split(":")[0]
+        for name in available_models:
+            if name.startswith(candidate_base + ":"):
+                return name
+
+    return requested_model
+
+
+def _ensure_models_in_background(base_url: str, model_names: list[str]) -> None:
+    """背景下載缺失模型，不阻塞應用啟動。"""
+    names = [name for name in dict.fromkeys(model_names) if name]
+    if not names:
+        return
+
+    def _worker():
+        try:
+            import ollama as _ollama_sdk
+            client = _ollama_sdk.Client(host=base_url)
+            for name in names:
+                _ensure_model_available(client, name)
+        except Exception as e:
+            logger.warning(f"[AI ENGINE] 背景模型安裝失敗：{e}")
+
+    threading.Thread(
+        target=_worker,
+        name="hopaoems-ai-model-puller",
+        daemon=True,
+    ).start()
+
+
 def init_ai_engine(app: "Flask") -> None:
     """
     在 Flask application context 中初始化 AI 引擎。
@@ -150,10 +201,11 @@ def init_ai_engine(app: "Flask") -> None:
     base_url = app.config.get("OLLAMA_BASE_URL", "http://localhost:11434")
     text_model = app.config.get("OLLAMA_MODEL", "qwen2.5:7b")
     vl_model = app.config.get("OLLAMA_VL_MODEL", "qwen3-vl:4b")
+    ocr_model = app.config.get("OLLAMA_OCR_MODEL", vl_model)
 
     app.logger.info(
         f"[AI ENGINE] 初始化 Ollama 後端 → "
-        f"base_url={base_url}, text_model={text_model}, vl_model={vl_model}"
+        f"base_url={base_url}, text_model={text_model}, vl_model={vl_model}, ocr_model={ocr_model}"
     )
 
     # 配置 ai_service 全域參數
@@ -161,27 +213,59 @@ def init_ai_engine(app: "Flask") -> None:
         base_url=base_url,
         text_model=text_model,
         vl_model=vl_model,
+        ocr_model=ocr_model,
     )
 
-    # 自動檢查並下載模型
+    # 自動檢查模型；預設不主動下載，優先退回已安裝模型以確保應用可啟動
     try:
         import ollama as _ollama_sdk
         client = _ollama_sdk.Client(host=base_url)
-        
-        # 檢查文字模型（Agent 決策大腦）
-        if not _ensure_model_available(client, text_model):
-            app.logger.warning(
-                f"[AI ENGINE] 文字模型 [{text_model}] 不可用，"
-                f"Agent 功能將降級。請手動執行：ollama pull {text_model}"
-            )
-        
-        # 檢查視覺模型（如果不同於文字模型）
-        if vl_model != text_model:
-            if not _ensure_model_available(client, vl_model):
-                app.logger.warning(
-                    f"[AI ENGINE] 視覺模型 [{vl_model}] 不可用，"
-                    f"圖片 OCR 功能將降級。請手動執行：ollama pull {vl_model}"
-                )
+        model_list = client.list()
+        available = [m.model for m in model_list.models]
+        auto_pull = bool(app.config.get("OLLAMA_AUTO_PULL_MODELS", True))
+
+        chosen_text_model = _pick_available_model(
+            text_model,
+            available,
+            ["qwen2.5:7b", "qwen2.5:3b", "qwen3:4b"],
+        )
+        chosen_vl_model = _pick_available_model(
+            vl_model,
+            available,
+            ["qwen3-vl:4b", "qwen2.5vl:3b", "gemma3:4b"],
+        )
+        chosen_ocr_model = _pick_available_model(
+            ocr_model,
+            available,
+            [chosen_vl_model, "qwen3-vl:4b", "qwen2.5vl:3b"],
+        )
+
+        if chosen_text_model != text_model:
+            app.logger.warning(f"[AI ENGINE] 文字模型 [{text_model}] 未安裝，改用已存在模型 [{chosen_text_model}]。")
+            text_model = chosen_text_model
+        if chosen_vl_model != vl_model:
+            app.logger.warning(f"[AI ENGINE] 視覺模型 [{vl_model}] 未安裝，改用已存在模型 [{chosen_vl_model}]。")
+            vl_model = chosen_vl_model
+        if chosen_ocr_model != ocr_model:
+            app.logger.warning(f"[AI ENGINE] OCR 模型 [{ocr_model}] 未安裝，改用已存在模型 [{chosen_ocr_model}]。")
+            ocr_model = chosen_ocr_model
+
+        ai_service.configure(
+            base_url=base_url,
+            text_model=text_model,
+            vl_model=vl_model,
+            ocr_model=ocr_model,
+        )
+
+        if auto_pull:
+            requested_models = [app.config.get("OLLAMA_MODEL", "qwen2.5:7b")]
+            requested_vl = app.config.get("OLLAMA_VL_MODEL", "qwen3-vl:4b")
+            requested_ocr = app.config.get("OLLAMA_OCR_MODEL", requested_vl)
+            if requested_vl not in requested_models:
+                requested_models.append(requested_vl)
+            if requested_ocr not in requested_models:
+                requested_models.append(requested_ocr)
+            _ensure_models_in_background(base_url, requested_models)
     except ImportError:
         app.logger.warning("[AI ENGINE] ollama SDK 未安裝，跳過模型檢查")
     except Exception as e:

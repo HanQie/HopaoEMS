@@ -100,6 +100,25 @@ HopaoUI.register('sample_preview', () => {
         if (radio) radio.checked = true;
     };
 
+    const updateRowSummary = (row) => {
+        if (!row) return;
+        const summary = row.querySelector('[data-hook="cc-summary-val"]');
+        if (!summary) return;
+
+        const mode = row.querySelector('[name="cc_mode"]')?.value || 'lab';
+        if (mode === 'lab') {
+            const l = row.querySelector('[name="cc_l"]')?.value || '-';
+            const a = row.querySelector('[name="cc_a"]')?.value || '-';
+            const b2 = row.querySelector('[name="cc_b2"]')?.value || '-';
+            const hasAny = [l, a, b2].some(v => v !== '-');
+            summary.textContent = hasAny ? `LAB: ${l}, ${a}, ${b2}` : 'LAB: -';
+            return;
+        }
+
+        const note = row.querySelector('[name="cc_note"]')?.value || '-';
+        summary.textContent = `Note: ${note}`;
+    };
+
     const addRow = (item) => {
         const body = document.querySelector(getH('CC_TBODY'));
         const template = document.querySelector(getH('CC_ROW_TEMPLATE'));
@@ -124,6 +143,7 @@ HopaoUI.register('sample_preview', () => {
         }
 
         applyModeVisibility(row);
+        updateRowSummary(row);
 
         const hex = item.hex || `/data/swatches/${rgbToHex(item.r, item.g, item.b).replace('#', '')}.png`;
         const swatch = row.querySelector(getH('ROW_SWATCH'));
@@ -358,13 +378,44 @@ HopaoUI.register('sample_preview', () => {
             if (hiddenInput) {
                 hiddenInput.value = modeRadio.value;
                 applyModeVisibility(row);
+                updateRowSummary(row);
                 saveDraft();
             }
         }
     });
 
     document.addEventListener('input', (e) => {
-        if (e.target.closest(getH('CC_TBODY'))) saveDraft();
+        const row = e.target.closest('[data-hook="cc-row"]');
+        if (row) {
+            updateRowSummary(row);
+            saveDraft();
+        }
+    });
+
+    document.addEventListener('hopao:sample-ai-autofill', (e) => {
+        const detail = e.detail || {};
+        const corrections = Array.isArray(detail.color_corrections) ? detail.color_corrections : [];
+        const body = document.querySelector(getH('CC_TBODY'));
+        if (!body) return;
+        if (!corrections.length && !detail.clear_color_corrections) return;
+        body.textContent = '';
+
+        corrections.forEach((row) => {
+            const mode = String(row.target_mode || '').toLowerCase() === 'lab' ? 'lab' : 'note';
+            addRow({
+                r: row.rgb_r,
+                g: row.rgb_g,
+                b: row.rgb_b,
+                mode: mode,
+                l: row.target_l ?? '',
+                a: row.target_a ?? '',
+                b2: row.target_b ?? '',
+                note: row.target_note ?? '',
+            });
+        });
+
+        updateContainerState();
+        saveDraft();
     });
 
     document.addEventListener('submit', (e) => {

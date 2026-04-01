@@ -81,6 +81,10 @@ def create_app(test_config=None):
         SECRET_KEY='dev',
         DATABASE=os.path.join(app.instance_path, 'hopaoems.sqlite'),
         MAX_CONTENT_LENGTH=None, # 無上限 (No limit)
+        OLLAMA_MODEL='qwen2.5:7b',
+        OLLAMA_VL_MODEL='qwen3-vl:4b',
+        OLLAMA_OCR_MODEL='qwen3-vl:4b',
+        OLLAMA_AUTO_PULL_MODELS=True,
     )
 
     if test_config is None:

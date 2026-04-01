@@ -4,6 +4,47 @@
 {% import 'macros/ui/components.html' as C %}
 
 {% block content %}
+{% if sample %}
+<div hidden id="ai-current-entity"
+    data-entity-type="sample"
+    data-entity-id="{{ sample.id }}"
+    data-sample-no="{{ sample.sample_no }}"
+    data-title="{{ sample.title or '' }}"></div>
+{% endif %}
+<script id="ai-field-manifest" type="application/json">
+{
+  "page_type": "sample_form",
+  "entity_type": "sample",
+  "fields": [
+    { "name": "date_received", "label": "{{ t('sample.fields.date_received') }}", "type": "date", "aliases": ["接收日期", "date received"] },
+    { "name": "sampled_date", "label": "{{ t('sample.fields.sampled_date') }}", "type": "date", "aliases": ["出樣日期", "sampled date"] },
+    { "name": "version", "label": "{{ t('sample.fields.version') }}", "type": "text", "aliases": ["版本", "version"] },
+    { "name": "sample_no", "label": "{{ t('sample.fields.no') }}", "type": "text", "aliases": ["樣品編號", "sample no", "樣號"] },
+    { "name": "fabric_no", "label": "{{ t('fabric.fields.fabric_no') }}", "type": "text", "aliases": ["布號", "fabric no"] },
+    { "name": "title", "label": "{{ t('sample.fields.title') }}", "type": "text", "aliases": ["標題", "title", "樣品名稱"] },
+    { "name": "printing_environment", "label": "{{ t('sample.fields.printing_environment') }}", "type": "text", "aliases": ["列印環境", "打印環境", "印花環境", "print environment"] },
+    { "name": "printing_file_name", "label": "{{ t('sample.fields.printing_file_name') }}", "type": "text", "aliases": ["打印檔名", "打印文件名", "print filename", "file name"] },
+    { "name": "remark", "label": "{{ t('common.remark') }}", "type": "textarea", "aliases": ["備註", "remark", "note"] }
+  ],
+  "groups": [
+    {
+      "name": "color_corrections",
+      "kind": "repeatable",
+      "aliases": ["顏色校正", "校色", "對色", "數色", "目標顏色", "LAB"],
+      "row_fields": [
+        { "name": "cc_r", "label": "RGB R", "type": "number" },
+        { "name": "cc_g", "label": "RGB G", "type": "number" },
+        { "name": "cc_b", "label": "RGB B", "type": "number" },
+        { "name": "cc_mode", "label": "Target Mode", "type": "text" },
+        { "name": "cc_l", "label": "L*", "type": "number" },
+        { "name": "cc_a", "label": "a*", "type": "number" },
+        { "name": "cc_b2", "label": "b*", "type": "number" },
+        { "name": "cc_note", "label": "{{ t('sample.color_corrections.fields.note') }}", "type": "text" }
+      ]
+    }
+  ]
+}
+</script>
 {% call L.ui_container(u_props='data-hook="sample-form-root"') %}
 
 {# ── A) Page Header (Cancel only) ── #}
@@ -143,10 +184,12 @@ variant='small', tone='subtle', u_props='data-hook="cc-row-rgb"', hook_class='ta
 
 {# Center: Target Summary #}
 <div data-hook="cc-collapsed-view">
-    {% set mode_label = t('sample.color_corrections.mode.note') if cm.target_mode == 'note' else
+    {% set target_mode_lc = (cm.target_mode or '')|lower %}
+    {% set is_note_mode = cm.target_mode and target_mode_lc != 'lab' %}
+    {% set mode_label = (cm.target_mode or t('sample.color_corrections.mode.note')) if is_note_mode else
     t('sample.color_corrections.mode.lab') %}
-    {% set summary_val = (cm.target_note|truncate(20)) if cm.target_mode == 'note' else
-    ((cm.target_l|string ~ ', ' ~ cm.target_a|string ~ ', ' ~ cm.target_b|string) if cm.target_l else
+    {% set summary_val = ((cm.target_note or '')|truncate(20)) if is_note_mode else
+    ((cm.target_l|string ~ ', ' ~ cm.target_a|string ~ ', ' ~ cm.target_b|string) if cm.target_l is not none else
     '-') %}
     {{ C.ui_text(text=mode_label ~ ': ' ~ summary_val, variant='small', tone='neutral',
     hook_class='font-medium', u_props='data-hook="cc-summary-val"') }}
@@ -167,22 +210,22 @@ title=t('common.delete'), u_props='data-action="cc-remove-row"') }}
     {% set row_mode_name = "mode_" ~ (cm.id if cm.id else "new_" ~ loop.index) %}
     {{ F.ui_radio(name=row_mode_name, value="lab",
     label=t('sample.color_corrections.mode.lab'),
-    checked=(cm.target_mode=='lab' or not cm.target_mode),
+    checked=(target_mode_lc=='lab' or not cm.target_mode),
     u_props='data-action="cc-mode"') }}
     {{ F.ui_radio(name=row_mode_name, value="note",
     label=t('sample.color_corrections.mode.note'),
-    checked=(cm.target_mode=='note'),
+    checked=(cm.target_mode and target_mode_lc != 'lab'),
     u_props='data-action="cc-mode"') }}
-    <input type="hidden" name="cc_mode" value="{{ cm.target_mode or 'lab' }}">
+    <input type="hidden" name="cc_mode" value="{{ 'lab' if target_mode_lc == 'lab' else (cm.target_mode or 'lab') }}">
     {% endcall %}
-    {% call L.ui_stack(u_props='data-hook="cc-lab-block" ' ~ ('hidden' if cm.target_mode == 'note' else ''))
+    {% call L.ui_stack(u_props='data-hook="cc-lab-block" ' ~ ('hidden' if cm.target_mode and target_mode_lc != 'lab' else ''))
     %}
     {% call L.ui_grid(cols=3, gap=2) %}
     {{ F.ui_input(name="cc_l", value=cm.target_l, placeholder='L*', size='xs') }}
     {{ F.ui_input(name="cc_a", value=cm.target_a, placeholder='a*', size='xs') }}
     {{ F.ui_input(name="cc_b2", value=cm.target_b, placeholder='b*', size='xs') }}
     {% endcall %}{% endcall %}
-    {% call L.ui_stack(u_props='data-hook="cc-note-block" ' ~ ('hidden' if cm.target_mode != 'note' else
+    {% call L.ui_stack(u_props='data-hook="cc-note-block" ' ~ ('hidden' if not (cm.target_mode and target_mode_lc != 'lab') else
     '')) %}
     {{ F.ui_input(name="cc_note", value=cm.target_note,
     placeholder=t('sample.color_corrections.fields.note')) }}

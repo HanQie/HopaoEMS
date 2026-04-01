@@ -1,5 +1,31 @@
 {% extends 'base.html' %}
 {% block content %}
+<script id="ai-field-manifest" type="application/json">
+{
+  "page_type": "stock_in_form",
+  "entity_type": "stock_in",
+  "fields": [
+    { "name": "fabric_id", "label": "{{ t('fabric.fields.fabric_code') }}", "type": "select", "aliases": ["布號", "布料代碼", "fabric code"] },
+    { "name": "existing_cylinder_id", "label": "{{ t('fabric.cylinder_no') }}", "type": "select", "aliases": ["既有缸號", "existing cylinder"] },
+    { "name": "cylinder_no", "label": "{{ t('fabric.cylinder_no') }}", "type": "text", "aliases": ["缸號", "cylinder no"] },
+    { "name": "cylinder_mode", "label": "{{ t('fabric.cylinder_no') }}模式", "type": "text", "aliases": ["缸號模式", "cylinder mode"] },
+    { "name": "tab", "label": "tab", "type": "text", "aliases": ["分頁", "tab"] }
+  ],
+  "groups": [
+    {
+      "name": "stock_in_rows",
+      "kind": "repeatable",
+      "aliases": ["入庫明細", "疋卡", "布疋", "roll rows"],
+      "row_fields": [
+        { "name": "roll_no", "label": "{{ t('roll.fields.roll_no') }}", "type": "text", "aliases": ["疋號", "roll no"] },
+        { "name": "weight_kg", "label": "{{ t('fabric.stock_in.fields.weight_kg') }}", "type": "number", "aliases": ["公斤", "重量", "kg"] },
+        { "name": "length_m", "label": "{{ t('fabric.fields.length') }}", "type": "number", "aliases": ["米數", "長度", "length", "m"] },
+        { "name": "remark", "label": "{{ t('common.remark') }}", "type": "text", "aliases": ["備註", "remark"] }
+      ]
+    }
+  ]
+}
+</script>
 {{ L.ui_page_header(
 title=t('fabric.stock_in.title'),
 actions=F.ui_button(label=t('common.back'), href=url_for('ui_fabric.fabric_explorer', fabric_id=fabric_id,
@@ -91,10 +117,10 @@ u_props='data-hook="stockin-cyl-mode-new"') }}
 {% if not fabric_id %}
 {% call C.ui_alert(tone='info') %}{{ t('fabric.explorer.select_fabric_hint') }}{% endcall %}
 {% elif not pre_selected_fabric.yard_weight_gyd %}
-{% call C.ui_alert(tone='danger') %}{{ t('fabric.stock_in.error.missing_gyd') }}{% endcall %}
+{% call C.ui_alert(tone='warning') %}{{ t('fabric.stock_in.error.missing_gyd') }}{% endcall %}
 {% endif %}
 
-{% if pre_selected_fabric and pre_selected_fabric.yard_weight_gyd %}
+{% if pre_selected_fabric %}
 {% call C.ui_text(variant='small', tone='subtle') %}
 {{ A.ui_icon('info-circle') }} {{ t('fabric.stock_in.warning.length_only') }}
 {% endcall %}
@@ -185,6 +211,7 @@ u_props='data-action="stockin-add-10"') }}
     u_props='data-hook="fabric-stockin-remark"') }}
     {% endcall %}
     {% call C.ui_td(align='right', hook_class='') %}
+    <input type="hidden" name="length_m_{{ i }}" value="" data-hook="fabric-stockin-length-input">
     {# Display Only #}
     {{ C.ui_text(text='-', variant='mono', tone='subtle', u_props='data-hook="fabric-stockin-length"') }}
     {% endcall %}
@@ -197,13 +224,8 @@ u_props='data-action="stockin-add-10"') }}
 {% call L.ui_form_footer() %}
 {{ F.ui_button(label=t('common.back'), href=url_for('ui_fabric.fabric_explorer', fabric_id=fabric_id,
 cylinder_id=cylinder_id, tab=tab), variant='secondary', icon='arrow-left') }}
-{% if pre_selected_fabric and pre_selected_fabric.yard_weight_gyd %}
 {{ F.ui_button(label=t('fabric.stock_in.actions.commit'), type='submit', variant='primary', icon='check-lg',
 form='stockin-form') }}
-{% else %}
-{{ F.ui_button(label=t('fabric.stock_in.actions.commit'), type='button', variant='neutral', disabled=True,
-icon='check-lg', form='stockin-form') }}
-{% endif %}
 {% endcall %}
 
 {% endcall %}

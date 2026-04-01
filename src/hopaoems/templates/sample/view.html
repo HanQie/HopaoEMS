@@ -18,6 +18,12 @@ title=t('sample.view.title', id=sample.sample_no) ~ ' · V' ~ disp_ver,
 actions=actions
 ) }}
 
+<div hidden id="ai-current-entity"
+    data-entity-type="sample"
+    data-entity-id="{{ sample.id }}"
+    data-sample-no="{{ sample.sample_no }}"
+    data-title="{{ sample.title or '' }}"></div>
+
 {% call L.ui_container() %}
 
 {# 1. KPI Strip: fabric_no / dates / corrections #}
@@ -105,7 +111,7 @@ t('sample.color_corrections.columns.target')
 {% endcall %}
 {# Target #}
 {% call C.ui_td() %}
-{% if cm.target_mode == 'lab' %}
+{% if (cm.target_mode or '')|lower == 'lab' %}
 {% call L.ui_stack(direction='row', spacing=2, align='center') %}
 {{ C.ui_badge(label='L ' ~ cm.target_l) }}
 {{ C.ui_badge(label='a ' ~ cm.target_a) }}

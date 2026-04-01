@@ -1,9 +1,11 @@
 
 import os
+import sys
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_from_directory, g
 from werkzeug.utils import secure_filename
 from ..services import sample_repo, auth_service
 from ..services.i18n import t
+
 
 def _process_image_upload(file):
     """Handle image upload: resize to max 2048px, convert to PNG, return filename."""
@@ -47,6 +49,34 @@ def _process_image_upload(file):
     except Exception as e:
         print(f"Image processing error: {e}")
         return False # Indicator for failure
+
+
+def _sync_sample_preview_vector(sample_id, preview_path):
+    """為 sample 預覽圖建立/更新向量快取，失敗不阻塞主流程。"""
+    if not sample_id or not preview_path:
+        return
+    try:
+        from ..ai_engine import ai_service
+
+        upload_dir = current_app.config['SAMPLES_UPLOAD_DIR']
+        image_path = os.path.join(upload_dir, preview_path)
+        if not os.path.exists(image_path):
+            return
+        with open(image_path, 'rb') as f:
+            image_bytes = f.read()
+
+        ai_service.upsert_image_vector(
+            db_path=current_app.config['DATABASE'],
+            image_path=preview_path,
+            image_bytes=image_bytes,
+            entity_type='sample',
+            entity_id=int(sample_id),
+        )
+    except Exception as e:
+        current_app.logger.warning(
+            f"[Sample] 預覽圖向量快取失敗 sample_id={sample_id} "
+            f"(python={sys.executable}): {e}"
+        )
 
 bp = Blueprint('ui_sample', __name__, url_prefix='/sample')
 
@@ -121,21 +151,25 @@ def sample_new():
         for i in range(len(rs)):
             if rs[i] == '': continue
             try:
+                mode = get_val(modes, i, 'note')
+                is_lab = str(mode).lower() == 'lab'
                 rows_to_save.append({
                     'rgb_r': int(rs[i]),
                     'rgb_g': int(gs[i]) if i < len(gs) else 0,
                     'rgb_b': int(bs[i]) if i < len(bs) else 0,
-                    'target_mode': get_val(modes, i, 'note'),
-                    'target_l': float(ls[i]) if i < len(ls) and ls[i] else None,
-                    'target_a': float(as_[i]) if i < len(as_) and as_[i] else None,
-                    'target_b': float(b2s[i]) if i < len(b2s) and b2s[i] else None,
-                    'target_note': get_val(notes, i)
+                    'target_mode': mode,
+                    'target_l': float(ls[i]) if is_lab and i < len(ls) and ls[i] else None,
+                    'target_a': float(as_[i]) if is_lab and i < len(as_) and as_[i] else None,
+                    'target_b': float(b2s[i]) if is_lab and i < len(b2s) and b2s[i] else None,
+                    'target_note': (get_val(notes, i) or '') if not is_lab else (get_val(notes, i) or '')
                 })
             except (ValueError, IndexError):
                 continue
         
         if rows_to_save:
             sample_repo.replace_color_corrections(sample_id, rows_to_save)
+
+        _sync_sample_preview_vector(sample_id, preview_path)
         
         flash(t('common.created_successfully'), 'success')
         return redirect(url_for('ui_sample.sample_list'))
@@ -167,15 +201,17 @@ def sample_save_corrections(id):
     for i in range(len(rs)):
         if rs[i] == '': continue
         try:
+            mode = get_val(modes, i, 'note')
+            is_lab = str(mode).lower() == 'lab'
             rows_to_save.append({
                 'rgb_r': int(rs[i]),
                 'rgb_g': int(gs[i]) if i < len(gs) else 0,
                 'rgb_b': int(bs[i]) if i < len(bs) else 0,
-                'target_mode': get_val(modes, i, 'note'),
-                'target_l': float(ls[i]) if i < len(ls) and ls[i] else None,
-                'target_a': float(as_[i]) if i < len(as_) and as_[i] else None,
-                'target_b': float(b2s[i]) if i < len(b2s) and b2s[i] else None,
-                'target_note': get_val(notes, i)
+                'target_mode': mode,
+                'target_l': float(ls[i]) if is_lab and i < len(ls) and ls[i] else None,
+                'target_a': float(as_[i]) if is_lab and i < len(as_) and as_[i] else None,
+                'target_b': float(b2s[i]) if is_lab and i < len(b2s) and b2s[i] else None,
+                'target_note': (get_val(notes, i) or '') if not is_lab else (get_val(notes, i) or '')
             })
         except (ValueError, IndexError):
             continue
@@ -277,15 +313,17 @@ def sample_edit(id):
         for i in range(len(rs)):
             if rs[i] == '': continue
             try:
+                mode = get_val(modes, i, 'note')
+                is_lab = str(mode).lower() == 'lab'
                 rows_to_save.append({
                     'rgb_r': int(rs[i]),
                     'rgb_g': int(gs[i]) if i < len(gs) else 0,
                     'rgb_b': int(bs[i]) if i < len(bs) else 0,
-                    'target_mode': get_val(modes, i, 'note'),
-                    'target_l': float(ls[i]) if i < len(ls) and ls[i] else None,
-                    'target_a': float(as_[i]) if i < len(as_) and as_[i] else None,
-                    'target_b': float(b2s[i]) if i < len(b2s) and b2s[i] else None,
-                    'target_note': get_val(notes, i)
+                    'target_mode': mode,
+                    'target_l': float(ls[i]) if is_lab and i < len(ls) and ls[i] else None,
+                    'target_a': float(as_[i]) if is_lab and i < len(as_) and as_[i] else None,
+                    'target_b': float(b2s[i]) if is_lab and i < len(b2s) and b2s[i] else None,
+                    'target_note': (get_val(notes, i) or '') if not is_lab else (get_val(notes, i) or '')
                 })
             except (ValueError, IndexError):
                 continue
@@ -319,6 +357,7 @@ def sample_edit(id):
             printing_file_name=printing_file_name,
             remark=remark
         )
+        _sync_sample_preview_vector(id, preview_path)
         flash(t('common.updated_successfully'), 'success')
         return redirect(url_for('ui_sample.sample_view', id=id))
 

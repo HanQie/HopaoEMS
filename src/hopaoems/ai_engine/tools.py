@@ -1,1014 +1,732 @@
 """
 tools.py
 ========
-Agent Tool 定義層。
+通用工具箱：Universal Tools for Schema-Aware Agent.
 
-每個 Tool 包含：
-  - SCHEMA : Ollama tools 格式的 JSON Schema（傳給模型做 Function Calling）
-  - execute(): 實際執行邏輯（調用 repo 層）
-
-Tools 一覽：
-  1. query_database        — 自然語言查詢資料庫
-  2. stock_in_full          — 完整入庫（布號 + 缸號 + 捲料列表）
-  3. partial_stock_in       — 部分入庫（僅布號）
-  4. log_production         — 登記生產記錄
-  5. lookup_fabric          — 查找布號是否存在
-  6. lookup_roll            — 搜索在庫捲料
-  7. ask_user               — 向用戶反問補充資訊
-  8. create_sample          — 建立樣品記錄
-  9. search_sample_by_image — 以圖搜樣品（CLIP 向量比對）
- 10. list_samples           — 搜索/列出樣品
+包含以下四大核心工具：
+1. universal_data_entry: 動態讀取 Schema 執行 upsert / delete
+2. universal_query_engine: 自然語言查詢 (Text-to-SQL)
+3. multimodal_processor: 視覺內容提取 / 以圖搜圖
+4. deduplicate_color_corrections: 樣品顏色重複資料去重
+5. ask_user: 關鍵資訊缺失回問
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+import sqlite3
+import re
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Tool Schemas（Ollama tools 格式）
-# ═══════════════════════════════════════════════════════════════════════════
+def _normalize_field_token(value: Any) -> str:
+    raw = str(value or "").strip().lower()
+    if not raw:
+        return ""
+    raw = raw.replace("*", "")
+    raw = re.sub(r"[:：]+$", "", raw)
+    raw = re.sub(r"[\s\-]+", "_", raw)
+    raw = re.sub(r"_+", "_", raw)
+    return raw.strip("_")
 
-TOOL_SCHEMAS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "extract_color_correction_data",
-            "description": "從用戶上傳的圖片中提取顏色校正表格數據（如 RGB -> LAB/YMCK）。當用戶提到「就在圖中」、發送顏色表圖片、或你找不到文字數據時使用。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "hint": {
-                        "type": "string",
-                        "description": "提供給視覺模型的額外提示（例如：提取這張圖中的 RGB 和 LAB 對應表）"
-                    }
-                }
-            }
+
+def _build_manifest_alias_map(field_manifest: dict[str, Any] | None) -> dict[str, str]:
+    manifest = field_manifest or {}
+    alias_map: dict[str, str] = {}
+
+    def register(field: dict[str, Any]) -> None:
+        if not isinstance(field, dict):
+            return
+        canonical = str(field.get("name") or "").strip()
+        if not canonical:
+            return
+
+        candidates = {
+            canonical,
+            field.get("label"),
+            field.get("db_field"),
         }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "batch_record_color_corrections",
-            "description": "批量記錄樣品顏色校正/換色數據。當用戶提供顏色表格（如 RGB 對應 LAB 或 YMCK）時使用。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "sample_query": {
-                        "type": "string",
-                        "description": "樣品編號或標題（自然語言或精確值）"
-                    },
-                    "corrections": {
-                        "type": "array",
-                        "description": "顏色校正列表",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "rgb_r": {"type": "integer", "description": "輸入層 R (0-255)"},
-                                "rgb_g": {"type": "integer", "description": "輸入層 G (0-255)"},
-                                "rgb_b": {"type": "integer", "description": "輸入層 B (0-255)"},
-                                "target_mode": {"type": "string", "description": "目標模式 (例如 'LAB', 'YMCKBHFm', 'note')"},
-                                "target_l": {"type": "number", "description": "LAB 的 L"},
-                                "target_a": {"type": "number", "description": "LAB 的 A"},
-                                "target_b": {"type": "number", "description": "LAB 的 B"},
-                                "target_note": {"type": "string", "description": "非 LAB 模式下的數值字串或備註"}
-                            },
-                            "required": ["rgb_r", "rgb_g", "rgb_b", "target_mode"]
-                        }
-                    }
-                },
-                "required": ["sample_query", "corrections"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "query_database",
-            "description": (
-                "查詢工廠管理系統的資料庫。可用於查詢庫存、訂單、生產記錄、布料資訊等。"
-                "將用戶的自然語言問題轉換為 SQL 並執行，回傳人類可讀的回答。"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "question": {
-                        "type": "string",
-                        "description": "用戶的查詢問題（自然語言）",
-                    }
-                },
-                "required": ["question"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "stock_in_full",
-            "description": (
-                "完整入庫登記：當用戶同時提供了布號、缸號、以及至少一筆捲料資料時使用。"
-                "會建立布號（如不存在）、缸號、以及所有捲料記錄。"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "fabric_code": {
-                        "type": "string",
-                        "description": "布料代碼（例如 F-001、95278）",
-                    },
-                    "cylinder_no": {
-                        "type": "string",
-                        "description": "缸號（例如 V-001）",
-                    },
-                    "rolls": {
-                        "type": "array",
-                        "description": "捲料列表",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "roll_no": {
-                                    "type": "string",
-                                    "description": "該疋的單獨捲號。如果是批量入庫且用戶提供連寫數字（如 12345），請拆解給每一疋分別填入 1, 2, 3, 4, 5。如果用戶沒提供捲號，請你自動幫每一疋填上 1, 2, 3, 4... 作為捲號。絕對不能把重量數值當成捲號！",
-                                },
-                                "weight_kg": {
-                                    "type": "number",
-                                    "description": "該疋的重量（公斤）",
-                                },
-                                "length_m": {
-                                    "type": "number",
-                                    "description": "長度（公尺）。禁止主動詢問此欄位，系統會自動根據克重換算。未提供時請直接留空或設為0。",
-                                },
-                            },
-                            "required": ["roll_no", "weight_kg"],
-                        },
-                    },
-                    "note": {
-                        "type": "string",
-                        "description": "備註（其他資訊）",
-                    },
-                    "material": {
-                        "type": "string",
-                        "description": "材質（例如 nylon、cotton、聚酯纖維等）",
-                    },
-                    "width_inch": {
-                        "type": "number",
-                        "description": "門幅寬度（英吋/inch），系統會自動換算為 mm",
-                    },
-                    "weight_gsm": {
-                        "type": "number",
-                        "description": "克重（g/m² 或 GSM），系統會根據門幅換算為 g/yd",
-                    },
-                },
-                "required": ["fabric_code", "cylinder_no", "rolls"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "register_fabric_only",
-            "description": (
-                "僅建立或註冊布號主檔：當用戶只想新增布號，或者目前沒有缸號/捲料資訊時使用。"
-                "只會建立布號記錄（如不存在），不會建立缸號或捲料。"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "fabric_code": {
-                        "type": "string",
-                        "description": "布料代碼（例如 95278）",
-                    },
-                    "material": {
-                        "type": "string",
-                        "description": "材質（例如 nylon、cotton、聚酯纖維等）",
-                    },
-                    "width_inch": {
-                        "type": "number",
-                        "description": "門幅寬度（英吋/inch），系統會自動換算為 mm",
-                    },
-                    "weight_gsm": {
-                        "type": "number",
-                        "description": "克重（g/m² 或 GSM），系統會根據門幅換算為 g/yd",
-                    },
-                    "note": {
-                        "type": "string",
-                        "description": "備註（其他資訊）",
-                    },
-                },
-                "required": ["fabric_code"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "log_production",
-            "description": (
-                "登記一筆生產記錄（消耗布匹）。"
-                "需要提供任務 ID、捲料 ID、消耗長度等資訊。"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "task_id": {
-                        "type": "integer",
-                        "description": "生產任務 ID",
-                    },
-                    "roll_id": {
-                        "type": "integer",
-                        "description": "捲料 ID",
-                    },
-                    "length_m": {
-                        "type": "number",
-                        "description": "消耗長度（公尺）",
-                    },
-                    "note": {
-                        "type": "string",
-                        "description": "備註",
-                    },
-                    "mark_depleted": {
-                        "type": "boolean",
-                        "description": "是否標記捲料為用盡",
-                    },
-                },
-                "required": ["task_id", "roll_id", "length_m"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "lookup_fabric",
-            "description": (
-                "查找某個布號是否已存在於系統中。"
-                "回傳布號的詳細資料或表示不存在。"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "fabric_code": {
-                        "type": "string",
-                        "description": "要查找的布料代碼",
-                    }
-                },
-                "required": ["fabric_code"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "lookup_roll",
-            "description": (
-                "搜索在庫的捲料。可按布號或捲號模糊搜索。"
-                "回傳符合條件的在庫捲料列表。"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "搜索關鍵字（布號或捲號）",
-                    }
-                },
-                "required": ["query"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "ask_user",
-            "description": (
-                "當你需要更多資訊才能完成用戶的請求時，使用此工具向用戶提問。"
-                "例如缺少缸號、捲號、長度等必要欄位時。"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "question_zh": {
-                        "type": "string",
-                        "description": "向用戶提出的問題（繁體中文）",
-                    },
-                    "question_vi": {
-                        "type": "string",
-                        "description": "向用戶提出的問題（越南語）",
-                    },
-                },
-                "required": ["question_zh", "question_vi"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "create_sample",
-            "description": (
-                "建立一個新的樣品記錄。"
-                "需要提供樣品編號和標題，可選提供布號、備註等。"
-                "注意：圖片上傳由系統另外處理，此工具只建立文字記錄。"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "sample_no": {
-                        "type": "string",
-                        "description": "樣品編號（例如 S-001）",
-                    },
-                    "title": {
-                        "type": "string",
-                        "description": "樣品名稱/標題",
-                    },
-                    "fabric_no": {
-                        "type": "string",
-                        "description": "對應的布號",
-                    },
-                    "remark": {
-                        "type": "string",
-                        "description": "備註",
-                    },
-                },
-                "required": ["sample_no", "title"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_sample_by_image",
-            "description": (
-                "以圖搜樣品：當用戶發送了一張圖片，使用此工具找出系統中與該圖片最相似的樣品。"
-                "利用 CLIP 圖片向量計算相似度，回傳最匹配的樣品列表。"
-                "此工具無需參數，會自動使用用戶上傳的圖片。"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "top_k": {
-                        "type": "integer",
-                        "description": "回傳前幾個最相似的結果（預設 5）",
-                    }
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_samples",
-            "description": (
-                "搜索或列出系統中的樣品。可按樣品編號或標題模糊搜索。"
-                "回傳符合條件的樣品列表。"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "搜索關鍵字（樣品編號或標題）",
-                    }
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "edit_sample",
-            "description": (
-                "修改樣品的資料，例如更新標題、布號或備註。"
-                "可以透過樣品編號或樣品標題模糊尋找。"
-                "如果用戶要求「清空」或「移除備註」，請務必傳入 note 參數，值為空字串 \"\"。"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "要修改的樣品編號或標題（用於搜尋比對）",
-                    },
-                    "title": {
-                        "type": "string",
-                        "description": "新標題（若不修改請省略）",
-                    },
-                    "fabric_no": {
-                        "type": "string",
-                        "description": "新的關聯布號（若不修改請省略）",
-                    },
-                    "remark": {
-                        "type": "string",
-                        "description": "新備註。若要清空則必須明確提供空字串 \"\"。（若不修改請省略）",
-                    },
-                },
-                "required": ["query"],
-            },
-        },
-    },
-]
+        for alias in field.get("aliases") or []:
+            candidates.add(alias)
+
+        for candidate in candidates:
+            token = _normalize_field_token(candidate)
+            if token:
+                alias_map[token] = canonical
+
+    for field in manifest.get("fields") or []:
+        register(field)
+    for group in manifest.get("groups") or []:
+        if not isinstance(group, dict):
+            continue
+        for field in group.get("row_fields") or []:
+            register(field)
+
+    return alias_map
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Tool 執行器
-# ═══════════════════════════════════════════════════════════════════════════
+def _normalize_entity_fields(
+    entity_type: str,
+    data: dict[str, Any],
+    field_manifest: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    將常見業務欄位別名轉成實際資料庫欄位名稱。
+    目的是讓通用寫入工具能吃下 UI / Agent 常用語彙。
+    """
+    if not isinstance(data, dict):
+        return {}
 
+    normalized = dict(data)
+    manifest_aliases = _build_manifest_alias_map(field_manifest)
+    if manifest_aliases:
+        remapped: dict[str, Any] = {}
+        for key, value in normalized.items():
+            canonical = manifest_aliases.get(_normalize_field_token(key), key)
+            if canonical not in remapped:
+                remapped[canonical] = value
+            elif remapped[canonical] in (None, "", []):
+                remapped[canonical] = value
+        normalized = remapped
+    alias_map: dict[str, dict[str, str]] = {
+        "fabrics": {
+            "material_type": "material",
+            "gram_per_yard": "yard_weight_gyd",
+            "weight_gyd": "yard_weight_gyd",
+            "width": "width_mm",
+        },
+    }
+
+    entity_aliases = alias_map.get(entity_type, {})
+    for source_key, target_key in entity_aliases.items():
+        if source_key in normalized and target_key not in normalized:
+            normalized[target_key] = normalized[source_key]
+        if source_key in normalized and source_key != target_key:
+            normalized.pop(source_key, None)
+
+    return normalized
+
+
+def _merge_upsert_identity(entity_type: str, args: dict[str, Any], data_dict: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
+    """
+    將工具層常見的識別資訊合併回 data_dict。
+    支援：
+    1. Agent 把 id 放在頂層 args，而不是 data_dict。
+    2. 當前頁面已鎖定某筆 sample，但 agent 只提供局部欄位更新。
+    """
+    merged = dict(data_dict or {})
+
+    top_level_id = args.get("id")
+    if top_level_id is not None and "id" not in merged:
+        try:
+            merged["id"] = int(top_level_id)
+        except Exception:
+            merged["id"] = top_level_id
+
+    current_entity = ctx.current_entity or {}
+    current_type = str(current_entity.get("type") or "").strip().lower()
+    current_id = current_entity.get("id")
+    type_matches_current = (
+        (entity_type == "samples" and current_type == "sample")
+        or (entity_type == current_type)
+        or (entity_type.rstrip("s") == current_type.rstrip("s") and current_type)
+    )
+    if current_id is not None and "id" not in merged and type_matches_current:
+        merged["id"] = current_id
+
+    return merged
+
+# ---------------------------------------------------------------------------
+# ToolContext 定義
+# ---------------------------------------------------------------------------
 class ToolContext:
     """Tool 執行時的上下文環境。"""
 
-    def __init__(self, db_path: str, lang: str, username: str, processor,
-                 image_bytes: bytes | None = None):
+    def __init__(
+        self,
+        db_path: str,
+        lang: str,
+        username: str,
+        conversation_id: str,
+        processor,
+        image_bytes: bytes | None = None,
+        current_entity: dict | None = None,
+        field_manifest: dict | None = None,
+    ):
         self.db_path = db_path
         self.lang = lang
         self.username = username
+        self.conversation_id = conversation_id
         self.processor = processor
-        self.image_bytes = image_bytes  # 用戶上傳的圖片（用於 search_sample_by_image）
+        self.image_bytes = image_bytes
+        self.current_entity = current_entity or {}
+        self.field_manifest = field_manifest or {}
 
-
-def execute_tool(name: str, arguments: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
-    """
-    根據 Tool 名稱分派執行。回傳 dict 結果（將被注入回 Agent 對話）。
-    """
-    logger.info(f"[Tools] 執行 Tool: {name}，參數: {json.dumps(arguments, ensure_ascii=False)[:200]}")
-
-    try:
-        if name == "query_database":
-            return _exec_query_database(arguments, ctx)
-        elif name == "stock_in_full":
-            return _exec_stock_in_full(arguments, ctx)
-        elif name == "register_fabric_only":
-            return _exec_partial_stock_in(arguments, ctx)
-        elif name == "log_production":
-            return _exec_log_production(arguments, ctx)
-        elif name == "lookup_fabric":
-            return _exec_lookup_fabric(arguments, ctx)
-        elif name == "lookup_roll":
-            return _exec_lookup_roll(arguments, ctx)
-        elif name == "ask_user":
-            return _exec_ask_user(arguments, ctx)
-        elif name == "create_sample":
-            return _exec_create_sample(arguments, ctx)
-        elif name == "search_sample_by_image":
-            return _exec_search_sample_by_image(arguments, ctx)
-        elif name == "list_samples":
-            return _exec_list_samples(arguments, ctx)
-        elif name == "edit_sample":
-            return _exec_edit_sample(arguments, ctx)
-        elif name == "batch_record_color_corrections":
-            return _exec_batch_record_color_corrections(arguments, ctx)
-        elif name == "extract_color_correction_data":
-            return _exec_extract_color_correction_data(arguments, ctx)
-        elif name == "delete_fabric":
-            return _exec_delete_fabric(arguments, ctx)
-        else:
-            return {"error": f"未知的 Tool: {name}"}
-    except Exception as e:
-        logger.error(f"[Tools] Tool '{name}' 執行失敗: {e}", exc_info=True)
-        return {"error": str(e)}
-
-
-# ---------------------------------------------------------------------------
-# 個別 Tool 實作
-# ---------------------------------------------------------------------------
-
-def _exec_query_database(args: dict, ctx: ToolContext) -> dict:
-    """自然語言查詢 → SQL → 人類語言回答。"""
-    from . import sql_agent
-    question = args.get("question", "")
-    reply = sql_agent.ask(question, ctx.lang, ctx.db_path, ctx.processor)
-    return {"reply": reply or "查詢未回傳結果。"}
-
-
-def _handle_fabric_units(args: dict, existing_data: dict | None = None) -> tuple:
-    """處理布料單位換算 (Inch -> mm, GSM -> g/yd)。"""
-    width_inch = args.get("width_inch")
-    weight_gsm = args.get("weight_gsm")
-    
-    # 取得現有值作為備援
-    current_width_mm = existing_data.get("width_mm") if existing_data else None
-    current_yard_weight_gyd = existing_data.get("yard_weight_gyd") if existing_data else None
-    
-    width_mm = current_width_mm
-    yard_weight_gyd = current_yard_weight_gyd
-    
-    if width_inch:
-        width_mm = round(float(width_inch) * 25.4, 1)
-        
-    if weight_gsm:
-        # 換算 g/yd 需要門幅資訊
-        # 如果用戶這次有給 width_inch，用這次的；否則看現有資料有沒有 width_mm
-        w_mm = width_mm or current_width_mm
-        if w_mm:
-            # g/yd = GSM * (width_m) * 0.9144
-            width_m = float(w_mm) / 1000.0
-            yard_weight_gyd = round(float(weight_gsm) * width_m * 0.9144, 1)
-            
-    return width_mm, yard_weight_gyd
-
-
-def _exec_stock_in_full(args: dict, ctx: ToolContext) -> dict:
-    """完整入庫：布號 + 缸號 + 捲料列表。"""
-    from ..services import fabric_repo
-
-    fabric_code = args["fabric_code"]
-    cylinder_no = str(args["cylinder_no"])
-    rolls_raw = args.get("rolls", [])
-    note = args.get("note") # 使用 get 而非 get(..., "") 以區分未提供與空字串
-
-    # 1. 確保布號存在
-    fabric = fabric_repo.get_fabric_by_code(fabric_code)
-    
-    # 處理單位換算
-    width_mm, yard_weight_gyd = _handle_fabric_units(args, dict(fabric) if fabric else None)
-    
-    if not fabric:
-        fabric = fabric_repo.create_fabric(
-            fabric_code=fabric_code,
-            material_type=args.get("material") or None,
-            width_mm=width_mm,
-            gram_per_yard=yard_weight_gyd,
-            remark=note or None,
-        )
-    else:
-        fabric = dict(fabric)
-        # 如果布號已存在，也更新其材質與備註（若有提供）
-        new_material = args.get("material") or fabric.get("material")
-        
-        # 如果 note 是 None (AI 沒提供)，保留原樣；如果是 "" (AI 提供空字串)，則清除
-        new_remark = note if note is not None else fabric.get("remark")
-        
-        fabric_repo.update_fabric(
-            id=fabric["id"],
-            fabric_code=fabric_code,
-            material_type=new_material,
-            width_mm=width_mm,
-            gram_per_yard=yard_weight_gyd,
-            remark=new_remark,
-        )
-        # 重新取得更新後的資料
-        fabric = fabric_repo.get_fabric(fabric["id"])
-    fabric_id = fabric["id"]
-
-    # 2. 準備捲料資料 (處理重複捲號問題)
-    from ..services.db import query_db
-    roll_rows = []
-    used_nos = set()
-    
-    # 預先載入資料庫中已存在的捲號，避免 SQLite Unique Constraint 錯誤
-    cylinder = query_db('SELECT id FROM cylinders WHERE fabric_id = ? AND cylinder_no = ?', (fabric_id, cylinder_no), one=True)
-    if cylinder:
-        existing_rolls = query_db('SELECT roll_no FROM rolls WHERE cylinder_id = ?', (cylinder['id'],))
-        for r in existing_rolls:
-            used_nos.add(r['roll_no'])
-    for i, r in enumerate(rolls_raw):
-        rno = str(r.get("roll_no", ""))
-        if not rno:
-            rno = f"R{i+1}"
-        
-        # 如果重複就把序號帶上去
-        orig_rno = rno
-        counter = 1
-        while rno in used_nos:
-            rno = f"{orig_rno}-{counter}"
-            counter += 1
-        used_nos.add(rno)
-
-        roll_rows.append({
-            "roll_no": rno,
-            "length_m": r.get("length_m", 0),
-            "weight_kg": r.get("weight_kg"),
-            "remark": note if note is not None else "",
-        })
-
-    # 3. 批次入庫
-    if roll_rows:
-        fabric_repo.create_stock_in_batch(
-            fabric_id=fabric_id,
-            cylinder_no=cylinder_no,
-            roll_rows=roll_rows,
-            user_name=ctx.username,
-        )
-
-    return {
-        "status": "success",
-        "fabric_id": fabric_id,
-        "fabric_code": fabric_code,
-        "cylinder_no": cylinder_no,
-        "rolls_created": len(roll_rows),
-    }
-
-
-def _exec_partial_stock_in(args: dict, ctx: ToolContext) -> dict:
-    """部分入庫：僅建立布號記錄。"""
-    from ..services import fabric_repo
-
-    fabric_code = args["fabric_code"]
-    note = args.get("note")
-
-    # 檢查是否已存在
-    existing = fabric_repo.get_fabric_by_code(fabric_code)
-    
-    # 處理單位換算
-    width_mm, yard_weight_gyd = _handle_fabric_units(args, dict(existing) if existing else None)
-    
-    if existing:
-        existing = dict(existing)
-        # 如果用戶提供了材質或備註，則更新現有記錄
-        new_material = args.get("material") or existing.get("material")
-        new_remark = note if note is not None else existing.get("remark")
-        
-        fabric_repo.update_fabric(
-            id=existing["id"],
-            fabric_code=fabric_code,
-            material_type=new_material,
-            width_mm=width_mm,
-            gram_per_yard=yard_weight_gyd,
-            remark=new_remark,
-        )
-        return {
-            "status": "updated",
-            "fabric_id": existing["id"],
-            "fabric_code": fabric_code,
-            "message": f"布號 {fabric_code} 已更新（材質：{new_material or '-'}，幅寬：{width_mm or '-'} mm，克重：{yard_weight_gyd or '-'} g/yd）。",
-        }
-
-    # 建立新布號
-    fabric = fabric_repo.create_fabric(
-        fabric_code=fabric_code,
-        material_type=args.get("material") or None,
-        width_mm=width_mm,
-        gram_per_yard=yard_weight_gyd,
-        remark=note if note is not None else None,
-    )
-    return {
-        "status": "created",
-        "fabric_id": fabric["id"],
-        "fabric_code": fabric_code,
-        "message": f"已成功建立布號 {fabric_code}（材質：{args.get('material') or '-'}，幅寬：{width_mm or '-'} mm，克重：{yard_weight_gyd or '-'} g/yd）。",
-    }
-
-
-def _exec_log_production(args: dict, ctx: ToolContext) -> dict:
-    """登記生產記錄。"""
-    from ..services import production_repo
-    from ..services.db import query_db
-
-    task_id = args["task_id"]
-    roll_id = args["roll_id"]
-    length_m = args["length_m"]
-    note = args.get("note", "")
-    mark_depleted = args.get("mark_depleted", False)
-
-    # 取得 operator_id
-    user = query_db(
-        "SELECT id FROM users WHERE username = ?",
-        (ctx.username,),
-        one=True,
-    )
-    operator_id = user["id"] if user else 1
-
-    log_id = production_repo.create_log(
-        task_id=task_id,
-        roll_id=roll_id,
-        length=length_m,
-        note=note,
-        operator_id=operator_id,
-        mark_depleted=mark_depleted,
-    )
-    return {
-        "status": "success",
-        "log_id": log_id,
-        "task_id": task_id,
-        "roll_id": roll_id,
-        "length_m": length_m,
-    }
-
-
-def _exec_lookup_fabric(args: dict, ctx: ToolContext) -> dict:
-    """查找布號。"""
-    from ..services import fabric_repo
-
-    fabric_code = args["fabric_code"]
-    fabric = fabric_repo.get_fabric_by_code(fabric_code)
-    if fabric:
-        fabric = dict(fabric)
-        return {
-            "found": True,
-            "fabric_id": fabric["id"],
-            "fabric_code": fabric["fabric_code"],
-            "material": fabric.get("material"),
-            "width_mm": fabric.get("width_mm"),
-            "yard_weight_gyd": fabric.get("yard_weight_gyd"),
-            "remark": fabric.get("remark"),
-        }
-    return {"found": False, "fabric_code": fabric_code}
-
-
-def _exec_lookup_roll(args: dict, ctx: ToolContext) -> dict:
-    """搜索在庫捲料。"""
-    from ..services import fabric_repo
-
-    query = args.get("query", "")
-    rolls = fabric_repo.search_in_stock_rolls(query=query)
-    results = []
-    for r in (rolls or [])[:20]:  # 限制回傳數量
-        results.append({
-            "roll_id": r["id"],
-            "roll_no": r["roll_no"],
-            "fabric_code": r.get("fabric_no", ""),
-            "cylinder_no": r.get("cylinder_no", ""),
-            "length_m": r["length_m"],
-            "status": r["status"],
-        })
-    return {"count": len(results), "rolls": results}
-
-
-def _exec_ask_user(args: dict, ctx: ToolContext) -> dict:
-    """向用戶反問。"""
-    return {
-        "action": "ask_user",
-        "question_zh": args.get("question_zh", ""),
-        "question_vi": args.get("question_vi", ""),
-    }
-
-
-def _exec_create_sample(args: dict, ctx: ToolContext) -> dict:
-    """建立樣品記錄。"""
-    from ..services import sample_repo
-
-    sample_no = args["sample_no"]
-    title = args["title"]
-    fabric_no = args.get("fabric_no", "")
-    remark = args.get("remark", "")
-
-    # 檢查是否已存在同樣品編號
-    from ..services.db import query_db
-    existing = query_db(
-        "SELECT id, sample_no, title FROM samples WHERE sample_no = ?",
-        (sample_no,), one=True,
-    )
-    if existing:
-        return {
-            "status": "already_exists",
-            "sample_id": existing["id"],
-            "sample_no": existing["sample_no"],
-            "title": existing["title"],
-            "message": f"樣品 {sample_no} 已存在。",
-        }
-
-    sample_id = sample_repo.create_sample(
-        sample_no=sample_no,
-        title=title,
-        fabric_no=fabric_no,
-        remark=remark or None,
-    )
-    return {
-        "status": "created",
-        "sample_id": sample_id,
-        "sample_no": sample_no,
-        "title": title,
-        "message": f"已成功建立樣品 {sample_no}：{title}",
-    }
-
-
-def _exec_search_sample_by_image(args: dict, ctx: ToolContext) -> dict:
-    """以圖搜樣品：使用 CLIP 向量比對 samples 的 preview 圖片。"""
-    if not ctx.image_bytes:
-        return {"error": "沒有收到圖片。請上傳一張圖片再試。"}
-
-    top_k = args.get("top_k", 5)
-
-    try:
-        from . import ai_service
+    def get_image(self, image_id: str | None = None) -> bytes | None:
+        """
+        取得圖片二進位資料。
+        若無上傳，則嘗試從暫存目錄中取得最新一張圖片。
+        """
         import os
-        import numpy as np
         from flask import current_app
 
-        # 1. 計算查詢圖片的 CLIP embedding
-        query_embedding = ai_service.compute_image_embedding(ctx.image_bytes)
-        q_norm = query_embedding / (np.linalg.norm(query_embedding) + 1e-9)
-
-        # 2. 遍歷所有有 preview_path 的 samples，計算相似度
-        from ..services.db import query_db
-        samples = query_db(
-            "SELECT id, sample_no, title, fabric_no, preview_path "
-            "FROM samples WHERE preview_path IS NOT NULL AND preview_path != ''"
+        temp_dir = os.path.join(
+            current_app.root_path,
+            "static",
+            "uploads",
+            "temp_ai",
+            self.username,
+            self.conversation_id,
         )
 
-        if not samples:
-            return {"count": 0, "samples": [], "message": "系統中沒有含預覽圖的樣品。"}
+        # 1. 指定 ID 讀取
+        if image_id:
+            safe_id = os.path.basename(image_id)
+            file_path = os.path.join(temp_dir, safe_id)
+            if os.path.isfile(file_path):
+                try:
+                    with open(file_path, "rb") as f:
+                        return f.read()
+                except Exception as e:
+                    current_app.logger.warning(f"無法讀取微庫圖片 {image_id}: {e}")
+            return None
 
-        upload_dir = current_app.config.get("SAMPLES_UPLOAD_DIR", "")
-        results = []
+        # 2. 本次有上傳
+        if self.image_bytes:
+            return self.image_bytes
 
-        for s in samples:
-            img_path = os.path.join(upload_dir, s["preview_path"])
-            if not os.path.exists(img_path):
-                continue
-
+        # 3. Fallback 到最新的圖片
+        if os.path.isdir(temp_dir):
             try:
-                with open(img_path, "rb") as f:
-                    sample_bytes = f.read()
-                sample_embedding = ai_service.compute_image_embedding(sample_bytes)
-                s_norm = sample_embedding / (np.linalg.norm(sample_embedding) + 1e-9)
-                score = float(np.dot(q_norm, s_norm))
-
-                results.append({
-                    "sample_id": s["id"],
-                    "sample_no": s["sample_no"],
-                    "title": s["title"],
-                    "fabric_no": s["fabric_no"],
-                    "score": round(score, 4),
-                })
+                files = [f for f in os.listdir(temp_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+                if files:
+                    files.sort()
+                    latest_file = files[-1]
+                    file_path = os.path.join(temp_dir, latest_file)
+                    with open(file_path, "rb") as f:
+                        return f.read()
             except Exception as e:
-                logger.warning(f"[Tools] 跳過 sample {s['id']}：{e}")
-                continue
+                current_app.logger.warning(f"無法讀取最新的微庫圖片: {e}")
 
-        # 按相似度排序
-        results.sort(key=lambda x: x["score"], reverse=True)
-        top_results = results[:top_k]
-
-        return {
-            "count": len(top_results),
-            "samples": top_results,
-            "message": (
-                f"找到 {len(top_results)} 個相似樣品。"
-                if top_results
-                else "沒有找到相似的樣品。"
-            ),
-        }
-    except ImportError as e:
-        return {"error": f"缺少必要的依賴套件：{e}。請安裝 sentence-transformers。"}
-    except Exception as e:
-        logger.error(f"[Tools] search_sample_by_image 失敗: {e}", exc_info=True)
-        return {"error": str(e)}
+        return None
 
 
-def _exec_list_samples(args: dict, ctx: ToolContext) -> dict:
-    """搜索/列出樣品。"""
-    from ..services import sample_repo
+# ---------------------------------------------------------------------------
+# Tool Schemas
+# ---------------------------------------------------------------------------
+UNIVERSAL_DATA_ENTRY_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "universal_data_entry",
+        "description": "實體寫入工具。action=upsert 時執行新增或更新；action=delete 時依條件刪除。這是唯一允許改變資料庫狀態的工具。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "description": "資料寫入動作。僅允許 upsert 或 delete。"
+                },
+                "entity_type": {
+                    "type": "string",
+                    "description": "資料表名稱，例如 'fabrics', 'samples', 'production_logs' 等。"
+                },
+                "id": {
+                    "type": ["integer", "string"],
+                    "description": "可選。更新既有資料時的目標 id。若當前頁面已鎖定某筆記錄，也建議帶入這個 id。"
+                },
+                "data_dict": {
+                    "type": "object",
+                    "description": "要寫入或更新的資料欄位與值，請務必使用 Schema 中實際存在的欄位名稱，例如 {\"fabric_code\": \"95278\"}"
+                },
+                "conditions": {
+                    "type": "object",
+                    "description": "刪除條件（AND 邏輯），例如 {\"id\": [1,2,3]} 或 {\"fabric_code\": \"95278\"}。僅 action=delete 時使用。"
+                }
+            },
+            "required": ["action", "entity_type"],
+        },
+    },
+}
 
-    query = args.get("query", "")
-    samples = sample_repo.list_samples(q=query if query else None)
-    results = []
-    for s in (samples or [])[:20]:
-        results.append({
-            "sample_id": s["id"],
-            "sample_no": s["sample_no"],
-            "title": s["title"],
-            "fabric_no": s.get("fabric_no", ""),
-            "preview_path": s.get("preview_path", ""),
-        })
-    return {"count": len(results), "samples": results}
+UNIVERSAL_QUERY_ENGINE_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "universal_query_engine",
+        "description": "自然語言查詢工具。用於查詢資料庫內容。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "natural_query": {
+                    "type": "string",
+                    "description": "用戶的自然語言查詢，例如 '列出今天建立的布號'"
+                }
+            },
+            "required": ["natural_query"],
+        },
+    },
+}
 
+MULTIMODAL_PROCESSOR_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "multimodal_processor",
+        "description": "多模態感官工具。action=extract 時做 OCR/結構化擷取；action=search 時做 CLIP/VSS 以圖搜圖。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "description": "多模態動作。僅允許 extract 或 search。"
+                },
+                "target_schema": {
+                    "type": "string",
+                    "description": "希望提取的 JSON Schema 或要求描述，例如 '{\"product_name\": \"str\", \"qty\": \"int\"}'。僅 action=extract 時使用。"
+                },
+                "image_id": {
+                    "type": "string",
+                    "description": "指定的圖片檔名（非必填）。如果不填，將自動使用最新上傳的圖片。"
+                },
+                "top_k": {
+                    "type": "integer",
+                    "description": "以圖搜圖回傳最多幾筆結果。僅 action=search 時使用，預設 5。"
+                }
+            },
+            "required": ["action"],
+        },
+    },
+}
 
-def _exec_edit_sample(args: dict, ctx: ToolContext) -> dict:
-    """編輯樣品的標題、布號或備註。"""
-    from ..services import sample_repo
+DEDUPLICATE_COLOR_CORRECTIONS_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "deduplicate_color_corrections",
+        "description": (
+            "刪除樣品中重複的顏色校正列。"
+            "當用戶提到『刪除重複原顏色』『同色只留一筆』『重複顏色去掉』時，"
+            "必須優先使用此工具，不可直接對 sample_color_map 做泛用刪除。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "sample_query": {
+                    "type": "string",
+                    "description": "樣品編號、標題，或目前頁面 sample 的識別資訊。當前頁面已是 sample 時可省略。"
+                },
+                "dedupe_by": {
+                    "type": "string",
+                    "enum": ["rgb", "rgb+target"],
+                    "description": "依 RGB 或 RGB+目標值判定重複。預設 rgb。"
+                },
+                "keep": {
+                    "type": "string",
+                    "enum": ["first", "last"],
+                    "description": "保留第一筆或最後一筆。預設 first。"
+                }
+            },
+        },
+    },
+}
 
-    query = args.get("query")
-    if not query:
-        return {"error": "Missing query parameter (sample_no or title)"}
+ASK_USER_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "ask_user",
+        "description": "向用戶詢問更多資訊或確認操作。若是因為缺少必填欄位或需要用戶親自確認，才可使用此工具。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "question_zh": {"type": "string", "description": "要詢問用戶的繁體中文問題"},
+                "question_vi": {"type": "string", "description": "要詢問用戶的越南文問題"},
+            },
+            "required": ["question_zh", "question_vi"],
+        },
+    },
+}
 
-    title = args.get("title")
-    fabric_no = args.get("fabric_no")
-    remark = args.get("remark")
+TOOL_SCHEMAS = [
+    UNIVERSAL_DATA_ENTRY_SCHEMA,
+    UNIVERSAL_QUERY_ENGINE_SCHEMA,
+    MULTIMODAL_PROCESSOR_SCHEMA,
+    DEDUPLICATE_COLOR_CORRECTIONS_SCHEMA,
+    ASK_USER_SCHEMA,
+]
+
+# ---------------------------------------------------------------------------
+# Tool Executors
+# ---------------------------------------------------------------------------
+def exec_universal_data_entry(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
+    """唯一寫入入口：處理 upsert / delete。"""
+    action = str(args.get("action") or "upsert").strip().lower()
+    if action == "delete":
+        return _exec_universal_delete(args, ctx)
+    if action != "upsert":
+        return {"error": "action 僅允許 upsert 或 delete"}
+
+    entity_type = args.get("entity_type")
+    data_dict = _normalize_entity_fields(
+        str(entity_type or ""),
+        args.get("data_dict", {}),
+        ctx.field_manifest,
+    )
+    data_dict = _merge_upsert_identity(str(entity_type or ""), args, data_dict, ctx)
+    
+    if not entity_type or not data_dict:
+        return {"error": "缺少 entity_type 或 data_dict"}
+    
+    # 防止 SQL Injection 表名
+    if not entity_type.isidentifier():
+        return {"error": f"不合法的資料表名稱: {entity_type}"}
 
     try:
-        res = sample_repo.update_sample_by_ai(
-            query=query,
-            title=title,
-            fabric_no=fabric_no,
-            remark=remark
-        )
-        if res.get("status") == "ambiguous":
-            options = [f"編號 {m['sample_no']} ({m['title']})" for m in res["matches"]]
-            return {
-                "status": "ambiguous",
-                "message": f"找到了多個符合 '{query}' 的樣品，請確認是哪一個？",
-                "options": options
-            }
-        
-        return {
-            "status": "updated",
-            "title": res["title"],
-            "message": f"樣品 '{res['title']}' 已更新。"
-        }
-    except Exception as e:
-        return {"error": str(e)}
+        conn = sqlite3.connect(ctx.db_path)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
 
+        # 1. 取得 Table Schema
+        cur.execute(f"PRAGMA table_info({entity_type})")
+        columns_info = cur.fetchall()
+        if not columns_info:
+            conn.close()
+            return {"error": f"找不到資料表 {entity_type}"}
 
-def _exec_batch_record_color_corrections(args: dict, ctx: ToolContext) -> dict:
-    """批量記錄換色數據。"""
-    from ..services import sample_repo
-    
-    sample_query = args.get("sample_query")
-    corrections = args.get("corrections", [])
-    
-    if not sample_query or not corrections:
-        return {"error": "Missing sample_query or corrections"}
-        
-    try:
-        # 先找到樣品
-        res = sample_repo.update_sample_by_ai(query=sample_query)
-        if res.get("status") == "ambiguous":
-             return {
-                "status": "ambiguous",
-                "message": f"找到了多個符合 '{sample_query}' 的樣品，請先確認是哪一個？",
-                "options": [f"{m['sample_no']} ({m['title']})" for m in res["matches"]]
-            }
-        
-        sample_id = res["id"]
-        count = 0
-        for c in corrections:
-            sample_repo.add_full_color_correction(
-                sample_id=sample_id,
-                rgb_r=c.get("rgb_r"),
-                rgb_g=c.get("rgb_g"),
-                rgb_b=c.get("rgb_b"),
-                target_mode=c.get("target_mode"),
-                target_l=c.get("target_l"),
-                target_a=c.get("target_a"),
-                target_b=c.get("target_b"),
-                target_note=c.get("target_note")
-            )
-            count += 1
+        primary_keys = []
+        required_cols = []
+        col_names = []
+
+        for col in columns_info:
+            c_name = col["name"]
+            c_notnull = col["notnull"]
+            c_dflt = col["dflt_value"]
+            c_pk = col["pk"]
+
+            col_names.append(c_name)
             
-        return {
-            "status": "success",
-            "message": f"已成功為樣品 '{res['title']}' 記錄 {count} 筆顏色換色數據。"
+            if c_pk > 0:
+                primary_keys.append(c_name)
+            
+            if c_notnull and c_dflt is None and c_pk == 0 and c_name not in ["id", "created_at", "updated_at"]:
+                required_cols.append(c_name)
+
+        # 過濾出 DB 中確實存在的欄位
+        filtered_data = {k: v for k, v in data_dict.items() if k in col_names}
+        ignored_fields = [k for k in data_dict.keys() if k not in col_names]
+        if not filtered_data:
+            conn.close()
+            return {"error": "沒有對應到任何有效的資料庫欄位"}
+
+        # 定義業務邏輯主鍵 (Logical Keys) 以彌補 SQLite Scheme 無 UNIQUE 的問題
+        LOGICAL_KEYS = {
+            "fabrics": "fabric_code",
+            "samples": "sample_no",
+            "cylinders": "batch_no",
+            "rolls": "roll_no",
         }
-    except Exception as e:
-        return {"error": str(e)}
-
-
-def _exec_extract_color_correction_data(args: dict, ctx: ToolContext) -> dict:
-    """使用視覺模型從圖片中提取顏色表數據。"""
-    if not ctx.image_bytes:
-        return {"error": "沒有收到圖片，無法提取數據。"}
-    
-    hint = args.get("hint", "請提取圖片中的顏色換色表格，包含輸入層(Input/RGB)與輸出層(Output/LAB/YMCK)的對應關係。")
-    
-    prompt = f"""
-{hint}
-請分析圖片中的表格，並將每一列轉換為 JSON 格式。
-輸出格式必須是純 JSON 列表，每一項包含：
-- rgb_r, rgb_g, rgb_b (數字)
-- target_mode (字串，如 'LAB', 'YMCKBHFm')
-- target_l, target_a, target_b (如果是 LAB 模式時的數字)
-- target_note (如果是非 LAB 模式時的數值字串或備註)
-
-只要回傳 JSON 列表即可。
-"""
-    try:
-        from . import ai_service
-        # 使用 vl_model 進行識別
-        raw = ai_service.call_ollama(
-            prompt=prompt,
-            images=[ctx.image_bytes],
-            temperature=0.0,
-            max_tokens=2048
-        )
         
-        # 解析 JSON
-        from .ai_service import _strip_think_tags
-        import json
-        import re
+        logical_key = LOGICAL_KEYS.get(entity_type)
+        exist_id = None
         
-        cleaned = _strip_think_tags(raw)
-        # 尋找 [ ... ]
-        start = cleaned.find("[")
-        end = cleaned.rfind("]")
-        if start != -1 and end != -1:
-            data = json.loads(cleaned[start:end+1])
+        # 檢查是否已存在 (以 SQLite PK 或 Logical Key)
+        if primary_keys[0] in filtered_data:
+            pk_val = filtered_data[primary_keys[0]]
+            row = cur.execute(f"SELECT id FROM {entity_type} WHERE {primary_keys[0]}=?", (pk_val,)).fetchone()
+            if row: exist_id = row["id"]
+        elif logical_key and logical_key in filtered_data:
+            lk_val = filtered_data[logical_key]
+            row = cur.execute(f"SELECT id FROM {entity_type} WHERE {logical_key}=?", (lk_val,)).fetchone()
+            if row: exist_id = row["id"]
+
+        if exist_id:
+            # UPDATE (部分建檔: 不檢查 NOT NULL，因為只更新提供的欄位)
+            immutable_lookup_cols = set(primary_keys)
+            if logical_key and logical_key in filtered_data:
+                immutable_lookup_cols.add(logical_key)
+
+            update_cols = [c for c in filtered_data.keys() if c not in immutable_lookup_cols]
+            if not update_cols:
+                conn.close()
+                if ignored_fields:
+                    return {
+                        "error": f"沒有可更新的有效欄位。已忽略欄位: {', '.join(ignored_fields)}",
+                        "status": "needs_clarification",
+                    }
+                return {
+                    "error": "資料已存在，但本次沒有提供可更新欄位。",
+                    "status": "needs_clarification",
+                }
+            
+            set_clause = ", ".join([f"{c}=?" for c in update_cols])
+            vals = [filtered_data[c] for c in update_cols]
+            vals.append(exist_id)
+            cur.execute(f"UPDATE {entity_type} SET {set_clause} WHERE id=?", vals)
+            conn.commit()
+            updated_row = cur.execute(f"SELECT * FROM {entity_type} WHERE id=?", (exist_id,)).fetchone()
+            conn.close()
+            reply_lang = "成功更新資料" if ctx.lang == "zh" else "Cập nhật dữ liệu thành công"
             return {
                 "status": "success",
-                "data": data,
-                "message": f"已成功從圖片中提取 {len(data)} 筆顏色數據。請確認後調用 batch_record_color_corrections 進行儲存。"
+                "message": f"{reply_lang} (Table: {entity_type}, ID: {exist_id})",
+                "updated_fields": {c: filtered_data[c] for c in update_cols},
+                "ignored_fields": ignored_fields,
+                "record": dict(updated_row) if updated_row else None,
             }
+
         else:
-            return {"error": "無法從模型回應中解析出 JSON 列表。", "raw_response": cleaned}
+            # INSERT (必須檢查 NOT NULL)
+            missing_cols = [c for c in required_cols if c not in filtered_data]
+            if missing_cols:
+                conn.close()
+                return {"error": f"缺少必填欄位: {', '.join(missing_cols)}"}
+
+            cols = list(filtered_data.keys())
+            vals = tuple(filtered_data.values())
+            placeholders = ", ".join(["?"] * len(cols))
             
+            cur.execute(f"INSERT INTO {entity_type} ({', '.join(cols)}) VALUES ({placeholders})", vals)
+            last_id = cur.lastrowid
+            conn.commit()
+            inserted_row = cur.execute(f"SELECT * FROM {entity_type} WHERE id=?", (last_id,)).fetchone()
+            conn.close()
+
+            reply_lang = "成功新增資料" if ctx.lang == "zh" else "Thêm dữ liệu thành công"
+            return {
+                "status": "success",
+                "message": f"{reply_lang} (Table: {entity_type}, ID: {last_id})",
+                "updated_fields": dict(filtered_data),
+                "ignored_fields": ignored_fields,
+                "record": dict(inserted_row) if inserted_row else None,
+            }
+
+    except sqlite3.IntegrityError as e:
+        return {"error": f"資料庫完整性錯誤 (可能資料重複或違反約束): {str(e)}"}
     except Exception as e:
-        logger.error(f"[Tools] extract_color_correction_data 失敗: {e}", exc_info=True)
+        logger.error(f"[UniversalDataEntry] 寫入失敗: {e}", exc_info=True)
         return {"error": str(e)}
 
+def _exec_universal_delete(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
+    """動態刪除資料庫紀錄。"""
+    entity_type = args.get("entity_type")
+    conditions = args.get("conditions", {})
+    if not entity_type or not conditions:
+        return {"error": "缺少 entity_type 或 conditions"}
+    
+    if not entity_type.isidentifier():
+        return {"error": f"不合法的資料表名稱: {entity_type}"}
 
-def _exec_delete_fabric(args: dict, ctx: ToolContext) -> dict:
-    """刪除布料代碼。"""
-    from ..services import fabric_repo
-    fabric_code = args.get("fabric_code")
-    if not fabric_code:
-        return {"error": "Missing fabric_code parameter"}
-        
+    # 安全防線：sample_color_map 的刪除非常容易誤刪整張樣品色票。
+    # 去重必須走專用 deduplicate_color_corrections；泛用刪除只允許指定明確 id。
+    if entity_type == "sample_color_map":
+        has_explicit_id = isinstance(conditions, dict) and "id" in conditions
+        if not has_explicit_id:
+            return {
+                "error": (
+                    "禁止對 sample_color_map 以 sample_id 或模糊條件做泛用刪除。"
+                    "若需求是刪除重複顏色，請改用 deduplicate_color_corrections；"
+                    "若要刪單筆，必須提供明確 id。"
+                ),
+                "status": "needs_clarification",
+            }
+
     try:
-        fabric_repo.delete_fabric_cascade(fabric_code)
-        return {
-            "status": "deleted",
-            "fabric_code": fabric_code,
-            "message": f"布號 {fabric_code} 及其所有的缸號與捲料紀錄已成功徹底刪除。"
-        }
+        conn = sqlite3.connect(ctx.db_path)
+        cur = conn.cursor()
+        
+        cur.execute(f"PRAGMA table_info({entity_type})")
+        columns_info = cur.fetchall()
+        if not columns_info:
+            conn.close()
+            return {"error": f"找不到資料表 {entity_type}"}
+            
+        valid_cols = [c[1] for c in columns_info]
+        filtered_conditions = {k: v for k, v in conditions.items() if k in valid_cols}
+        
+        if not filtered_conditions:
+            conn.close()
+            return {"error": "提供的條件沒有對應到任何有效的資料庫欄位"}
+            
+        where_clauses = []
+        vals = []
+        for k, v in filtered_conditions.items():
+            if isinstance(v, list):
+                if not v: continue
+                placeholders = ", ".join(["?"] * len(v))
+                where_clauses.append(f"{k} IN ({placeholders})")
+                vals.extend(v)
+            else:
+                where_clauses.append(f"{k}=?")
+                vals.append(v)
+                
+        if not where_clauses:
+            conn.close()
+            return {"error": "提供的條件為空 (可能是空的陣列)"}
+            
+        where_clause_str = " AND ".join(where_clauses)
+        
+        missing_vals = {}
+        for k, v in filtered_conditions.items():
+            check_vals = v if isinstance(v, list) else [v]
+            if not check_vals: continue
+            placeholders = ", ".join(["?"] * len(check_vals))
+            cur.execute(f"SELECT DISTINCT {k} FROM {entity_type} WHERE {k} IN ({placeholders})", check_vals)
+            found = [str(r[0]) for r in cur.fetchall()]
+            missing = [item for item in check_vals if str(item) not in found]
+            if missing:
+                missing_vals[k] = missing
+
+        if missing_vals:
+            suggestions = {}
+            for k, missing_list in missing_vals.items():
+                col_suggs = []
+                for item in missing_list:
+                    cur.execute(f"SELECT DISTINCT {k} FROM {entity_type} WHERE {k} LIKE ? LIMIT 5", (f"%{item}%",))
+                    for r in cur.fetchall():
+                        if r[0] not in col_suggs:
+                            col_suggs.append(r[0])
+                if col_suggs:
+                    suggestions[k] = col_suggs
+
+            conn.close()
+            err_msg = [f"無法執行刪除，因為有部分條件無法精確匹配: {missing_vals}"]
+            if suggestions:
+                err_msg.append(f"👉 發現可能相似的紀錄: {suggestions}")
+                err_msg.append("請向用戶詢問是否是指這些紀錄，如果是，請用戶確認後再重新以正確名稱調用本工具。")
+            else:
+                err_msg.append("而且資料庫中也找不到相似的紀錄，請向用戶回報。")
+            return {"error": "\n".join(err_msg), "status": "needs_clarification"}
+
+        cur.execute(f"SELECT COUNT(*) FROM {entity_type} WHERE {where_clause_str}", vals)
+        count = cur.fetchone()[0]
+        if count == 0:
+            conn.close()
+            return {"error": "找不到符合所有給定條件的紀錄", "status": "needs_clarification"}
+            
+        cur.execute(f"DELETE FROM {entity_type} WHERE {where_clause_str}", vals)
+        conn.commit()
+        conn.close()
+        
+        msg = f"成功刪除 {count} 筆記錄 (Table: {entity_type})" if ctx.lang == "zh" else f"Đã xóa thành công {count} bản ghi (Table: {entity_type})"
+        return {"status": "success", "message": msg, "deleted_count": count}
+        
+    except sqlite3.IntegrityError as e:
+        return {"error": f"資料刪除失敗，可能有外鍵依賴 (如有其他資料綁定此紀錄則無法刪除): {str(e)}"}
     except Exception as e:
+        logger.error(f"[UniversalDeleteEntry] 刪除失敗: {e}", exc_info=True)
+        return {"error": str(e)}
+
+def exec_universal_query_engine(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
+    natural_query = args.get("natural_query", "")
+    if not natural_query:
+        return {"error": "請提供查詢語句"}
+    
+    from .sql_agent import ask
+    try:
+        ans = ask(
+            question=natural_query,
+            lang=ctx.lang,
+            db_path=ctx.db_path,
+            processor=ctx.processor
+        )
+        return {"reply": ans}
+    except Exception as e:
+        return {"error": f"查詢執行失敗: {str(e)}"}
+
+def exec_multimodal_processor(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
+    action = str(args.get("action") or "extract").strip().lower()
+    target_schema = args.get("target_schema", "")
+    image_id = args.get("image_id")
+    img_bytes = ctx.get_image(image_id)
+    if not img_bytes:
+        return {"error": "未找到相關圖片"}
+
+    if action == "extract":
+        prompt = f"請識別這張圖片，並依照以下 Schema 規則或要求提取資料，請只回傳符合結構的 JSON，不要有任何 Markdown 或額外文字。\nSchema/要求：\n{target_schema}"
+        from .ai_service import call_ollama, _extract_json_object, extract_text_from_image_local
+        try:
+            raw = call_ollama(
+                prompt=prompt,
+                images=[img_bytes],
+                model="qwen3-vl:4b",
+                temperature=0.0,
+                max_tokens=1024
+            )
+
+            extracted = _extract_json_object(raw)
+            if not extracted:
+                local_text = extract_text_from_image_local(img_bytes)
+                return {
+                    "action": "extract",
+                    "extracted_text": raw or local_text,
+                    "fallback": "local_ocr" if local_text and not raw else None,
+                }
+            return {"action": "extract", "extracted_data": extracted}
+        except Exception as e:
+            logger.error(f"[MultimodalProcessor] extract 失敗: {e}", exc_info=True)
+            local_text = extract_text_from_image_local(img_bytes)
+            if local_text:
+                return {
+                    "action": "extract",
+                    "extracted_text": local_text,
+                    "warning": f"vision_model_failed: {e}",
+                    "fallback": "local_ocr",
+                }
+            return {
+                "action": "extract",
+                "extracted_text": "",
+                "warning": f"vision_model_failed: {e}",
+            }
+
+    if action == "search":
+        from .ai_service import compute_image_embedding, search_similar_images
+        try:
+            top_k = int(args.get("top_k") or 5)
+            query_embedding = compute_image_embedding(img_bytes)
+            matches = search_similar_images(
+                query_embedding=query_embedding,
+                db_path=ctx.db_path,
+                top_k=max(1, min(top_k, 20)),
+            )
+            return {
+                "action": "search",
+                "matches": matches,
+                "count": len(matches),
+            }
+        except Exception as e:
+            logger.error(f"[MultimodalProcessor] search 失敗: {e}", exc_info=True)
+            return {"error": str(e)}
+
+    return {"error": "multimodal_processor.action 僅允許 extract 或 search"}
+
+
+def exec_deduplicate_color_corrections(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
+    from .tooling.color_tools import exec_deduplicate_color_corrections as _dedupe_executor
+
+    return _dedupe_executor(args, ctx)
+
+def exec_ask_user(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
+    # 直接回傳，Agent 迴圈會捕捉這個然後設定狀態為 need_info
+    return args
+
+TOOL_EXECUTORS: dict[str, Callable[[dict[str, Any], ToolContext], dict[str, Any]]] = {
+    "universal_data_entry": exec_universal_data_entry,
+    "universal_query_engine": exec_universal_query_engine,
+    "multimodal_processor": exec_multimodal_processor,
+    "deduplicate_color_corrections": exec_deduplicate_color_corrections,
+    "ask_user": exec_ask_user,
+    # backward compatibility
+    "universal_delete_entry": _exec_universal_delete,
+    "multimodal_extractor": exec_multimodal_processor,
+}
+
+def execute_tool(name: str, arguments: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
+    logger.info(f"[Tools] 執行 Tool: {name}，參數: {json.dumps(arguments, ensure_ascii=False)[:200]}")
+    executor = TOOL_EXECUTORS.get(name)
+    if executor is None:
+        return {"error": f"未知的 Tool: {name}"}
+
+    try:
+        return executor(arguments, ctx)
+    except Exception as e:
+        logger.error(f"[Tools] Tool '{name}' 執行失敗: {e}", exc_info=True)
         return {"error": str(e)}

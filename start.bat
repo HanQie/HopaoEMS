@@ -19,16 +19,16 @@ echo =======================================================
 echo          HopaoEMS Launcher (Ollama)
 echo =======================================================
 echo.
-echo   1. Start HopaoEMS (Normal)
-echo   2. Start HopaoEMS (Skip GATE)
+echo   1. Start HopaoEMS (Recommended)
+echo   2. Start HopaoEMS (Run GATE first)
 echo   0. Exit
 echo.
 echo =======================================================
 set choice=
 set /p choice="Select (0-2): "
 
-if "%choice%"=="1" set "SKIP_GATES=false" & goto START_APP
-if "%choice%"=="2" set "SKIP_GATES=true" & goto START_APP
+if "%choice%"=="1" set "SKIP_GATES=true" & goto START_APP
+if "%choice%"=="2" set "SKIP_GATES=false" & goto START_APP
 if "%choice%"=="0" exit /b 0
 
 echo Invalid choice. Try again.
@@ -40,9 +40,15 @@ echo.
 echo [Info] Starting HopaoEMS with Ollama backend...
 echo [Info] URL: http://localhost:8080
 echo [Info] Press Ctrl+C to stop.
+if "%SKIP_GATES%"=="true" (
+    echo [Info] Startup mode: skip GATE checks
+) else (
+    echo [Info] Startup mode: run GATE checks before app start
+)
 echo.
 
 rem Start Flask on port 8080
+set "PYTHONUNBUFFERED=1"
 "%PYTHON%" "%PROJECT_ROOT%\src\run.py" 8080
 
 echo.

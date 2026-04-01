@@ -23,13 +23,117 @@
     return raw.startsWith('vi') ? 'vi' : 'zh';
   }
 
+  function getCurrentEntity() {
+    const hint = document.getElementById('ai-current-entity');
+    if (!hint) return null;
+    const { entityType, entityId, sampleNo, title } = hint.dataset;
+    if (!entityType || !entityId) return null;
+    return {
+      type: entityType,
+      id: Number(entityId),
+      sample_no: sampleNo || '',
+      title: title || '',
+    };
+  }
+
+  function cssEscape(value) {
+    if (window.CSS && typeof window.CSS.escape === 'function') {
+      return window.CSS.escape(value);
+    }
+    return String(value).replace(/["\\]/g, '\\$&');
+  }
+
+  function findFieldLabel(el) {
+    if (!el) return '';
+    const elId = el.getAttribute('id');
+    if (elId) {
+      const byFor = document.querySelector(`label[for="${cssEscape(elId)}"]`);
+      if (byFor && byFor.textContent) return byFor.textContent.trim();
+    }
+
+    const closestLabel = el.closest('label');
+    if (closestLabel && closestLabel.textContent) return closestLabel.textContent.trim();
+
+    const wrappers = ['[data-hook*="field"]', '.ui-field', '.form-field', '.field'];
+    for (const selector of wrappers) {
+      const wrapper = el.closest(selector);
+      if (!wrapper) continue;
+      const label = wrapper.querySelector('label');
+      if (label && label.textContent) return label.textContent.trim();
+    }
+
+    const prev = el.previousElementSibling;
+    if (prev && prev.tagName === 'LABEL' && prev.textContent) {
+      return prev.textContent.trim();
+    }
+
+    return '';
+  }
+
+  function getFieldManifest() {
+    const manifestEl = document.getElementById('ai-field-manifest');
+    if (manifestEl) {
+      try {
+        const raw = manifestEl.textContent || '{}';
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') return parsed;
+      } catch (e) {
+        console.error('Failed to parse ai-field-manifest', e);
+      }
+    }
+
+    const form = document.querySelector('form');
+    if (!form) return null;
+    const fields = [];
+    form.querySelectorAll('input[name], select[name], textarea[name]').forEach((el) => {
+      const name = (el.getAttribute('name') || '').trim();
+      const type = (el.getAttribute('type') || el.tagName || '').toLowerCase();
+      if (!name || type === 'hidden' || type === 'file') return;
+      const label = findFieldLabel(el) || el.getAttribute('aria-label') || el.getAttribute('placeholder') || name;
+      const aliases = [label, name.replace(/_/g, ' ')];
+      const placeholder = (el.getAttribute('placeholder') || '').trim();
+      if (placeholder && placeholder !== name) aliases.push(placeholder);
+      fields.push({
+        name,
+        label,
+        type,
+        aliases: aliases.filter(Boolean),
+      });
+    });
+    if (!fields.length) return null;
+    return { page_type: 'generic_form', fields, groups: [] };
+  }
+
   // -------------------------------------------------------------------------
   // 持久化 (SessionStorage)
   // -------------------------------------------------------------------------
   const STORAGE_KEY_HISTORY = 'ai_chat_history';
   const STORAGE_KEY_STATE = 'ai_chat_isOpen';
+  const STORAGE_KEY_CONVERSATION = 'ai_chat_conversation_id';
 
   let chatHistory = [];
+
+  function createConversationId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+    return `conv_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  function getConversationId() {
+    let id = sessionStorage.getItem(STORAGE_KEY_CONVERSATION);
+    if (!id) {
+      id = createConversationId();
+      sessionStorage.setItem(STORAGE_KEY_CONVERSATION, id);
+    }
+    return id;
+  }
+
+  function resetConversation() {
+    const id = createConversationId();
+    sessionStorage.setItem(STORAGE_KEY_CONVERSATION, id);
+    return id;
+  }
 
   function loadHistory() {
     try {
@@ -37,7 +141,7 @@
       if (saved) {
         chatHistory = JSON.parse(saved);
         chatHistory.forEach(msg => {
-          renderMessage(msg.role, msg.text, false);
+          renderMessage(msg.role, msg.text, false, msg.meta || null);
         });
       }
     } catch(e) { console.error('Failed to load chat history', e); }
@@ -61,7 +165,9 @@
 
   function clearHistory() {
     chatHistory = [];
+    resetConversation();
     saveHistory();
+    clearFile();
     if (messagesEl) {
       messagesEl.textContent = '';
       const title = document.createElement('p');
@@ -105,8 +211,10 @@
   // -------------------------------------------------------------------------
   // 訊息渲染
   // -------------------------------------------------------------------------
-  function renderMessage(role, text, save = true) {
+  function renderMessage(role, text, save = true, meta = null) {
     if (!messagesEl) return;
+    const hasReasoning = Boolean(meta && meta.reasoning_summary && meta.reasoning_summary.trim());
+    const hasToolTrace = Boolean(meta && Array.isArray(meta.tool_trace) && meta.tool_trace.length);
     const wrap = document.createElement('div');
     wrap.className = role === 'user'
       ? 'flex justify-end'
@@ -119,17 +227,46 @@
 
     bubble.textContent = text;
     wrap.appendChild(bubble);
+
+    if (role !== 'user' && (hasReasoning || hasToolTrace)) {
+      const debugBox = document.createElement('details');
+      debugBox.className = 'mt-2 max-w-[85%] rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-slate-700';
+
+      const summaryEl = document.createElement('summary');
+      summaryEl.className = 'cursor-pointer font-medium text-amber-900';
+      summaryEl.textContent = getLang() === 'vi' ? 'Debug reasoning' : 'Debug 推理摘要';
+      debugBox.appendChild(summaryEl);
+
+      if (hasReasoning) {
+        const reasoningEl = document.createElement('pre');
+        reasoningEl.className = 'mt-2 whitespace-pre-wrap break-words text-xs text-slate-700';
+        reasoningEl.textContent = meta.reasoning_summary;
+        debugBox.appendChild(reasoningEl);
+      }
+
+      if (hasToolTrace) {
+        const traceEl = document.createElement('pre');
+        traceEl.className = 'mt-2 whitespace-pre-wrap break-words text-[11px] text-slate-600';
+        traceEl.textContent = meta.tool_trace.map((item, idx) =>
+          `${idx + 1}. ${item.tool}\nargs: ${JSON.stringify(item.args, null, 2)}\nresult: ${JSON.stringify(item.result, null, 2)}`
+        ).join('\n\n');
+        debugBox.appendChild(traceEl);
+      }
+
+      wrap.appendChild(debugBox);
+    }
+
     messagesEl.appendChild(wrap);
     messagesEl.scrollTop = messagesEl.scrollHeight;
 
     if (save) {
-      chatHistory.push({ role, text });
+      chatHistory.push({ role, text, meta });
       saveHistory();
     }
   }
 
-  function appendMessage(role, text) {
-    renderMessage(role, text, true);
+  function appendMessage(role, text, meta = null) {
+    renderMessage(role, text, true, meta);
   }
 
   function appendSpinner() {
@@ -167,8 +304,150 @@
     note      : ['note'],
   };
 
+  function autofillSampleForm(params) {
+    if (!params) return false;
+    let changed = autofillFields(params.sample_fields || {});
+
+    if (autofillFields(params.fields || {})) {
+      changed = true;
+    }
+
+    if (Array.isArray(params.color_corrections) && params.color_corrections.length) {
+      document.dispatchEvent(new CustomEvent('hopao:sample-ai-autofill', {
+        detail: {
+          color_corrections: params.color_corrections,
+          clear_color_corrections: Boolean(params.clear_color_corrections),
+        },
+      }));
+      changed = true;
+    }
+
+    if (params.clear_color_corrections && !Array.isArray(params.color_corrections)) {
+      document.dispatchEvent(new CustomEvent('hopao:sample-ai-autofill', {
+        detail: { color_corrections: [], clear_color_corrections: true },
+      }));
+      changed = true;
+    }
+
+    return changed;
+  }
+
+  function autofillFields(fields) {
+    if (!fields || typeof fields !== 'object') return false;
+    let changed = false;
+    Object.entries(fields).forEach(([name, value]) => {
+      if (value === null || value === undefined || value === '') return;
+      const el = document.querySelector(
+        `input[name="${name}"], select[name="${name}"], textarea[name="${name}"]`
+      );
+      if (!el) return;
+      el.value = value;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      changed = true;
+    });
+    return changed;
+  }
+
+  function setNamedFieldValue(name, value, triggerEvents = true) {
+    if (value === null || value === undefined || value === '') return false;
+    const el = document.querySelector(
+      `input[name="${name}"], select[name="${name}"], textarea[name="${name}"]`
+    );
+    if (!el) return false;
+    el.value = value;
+    if (triggerEvents) {
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    return true;
+  }
+
+  function ensureOrderItemRows(count) {
+    const root = document.querySelector('[data-hook="order-form-root"]');
+    if (!root) return [];
+    const container = root.querySelector('[data-hook="items-container"]');
+    const addBtn = root.querySelector('[data-action="add-item"]');
+    if (!container) return [];
+    let rows = Array.from(container.querySelectorAll('[data-hook="order-item-row"]'));
+    while (rows.length < count && addBtn) {
+      addBtn.click();
+      rows = Array.from(container.querySelectorAll('[data-hook="order-item-row"]'));
+    }
+    return rows;
+  }
+
+  function autofillOrderForm(params) {
+    if (!params) return false;
+    let changed = autofillFields(params.fields || {});
+    const items = Array.isArray(params.order_items) ? params.order_items : [];
+    if (!items.length) return changed;
+
+    const rows = ensureOrderItemRows(items.length);
+    items.forEach((item, idx) => {
+      const prefix = `items[${idx}]`;
+      if (setNamedFieldValue(`${prefix}[fabric_no]`, item.fabric_no)) changed = true;
+      if (setNamedFieldValue(`${prefix}[sample_id]`, item.sample_id)) changed = true;
+      if (setNamedFieldValue(`${prefix}[qty]`, item.qty)) changed = true;
+      if (setNamedFieldValue(`${prefix}[note]`, item.note)) changed = true;
+    });
+    return changed;
+  }
+
+  function ensureStockInRows(count) {
+    const form = document.querySelector('[data-hook="fabric-stockin-form"]');
+    if (!form) return [];
+    const addBtn = document.querySelector('[data-action="stockin-add-1"]');
+    let rows = Array.from(form.querySelectorAll('[data-hook="fabric-stockin-row"]'));
+    while (rows.length < count && addBtn) {
+      addBtn.click();
+      rows = Array.from(form.querySelectorAll('[data-hook="fabric-stockin-row"]'));
+    }
+    return rows;
+  }
+
+  function autofillStockInForm(params) {
+    if (!params) return false;
+    let changed = false;
+
+    const fields = params.fields || {};
+    Object.entries(fields).forEach(([name, value]) => {
+      const trigger = name !== 'fabric_id';
+      if (setNamedFieldValue(name, value, trigger)) changed = true;
+    });
+
+    const rows = Array.isArray(params.stock_in_rows) ? params.stock_in_rows : [];
+    if (!rows.length) return changed;
+
+    ensureStockInRows(rows.length);
+    rows.forEach((row, idx) => {
+      const n = idx + 1;
+      if (setNamedFieldValue(`roll_no_${n}`, row.roll_no)) changed = true;
+      if (setNamedFieldValue(`weight_kg_${n}`, row.weight_kg)) changed = true;
+      if (setNamedFieldValue(`length_m_${n}`, row.length_m)) changed = true;
+      if (setNamedFieldValue(`remark_${n}`, row.remark)) changed = true;
+      const weightEl = document.querySelector(`input[name="weight_kg_${n}"]`);
+      if (weightEl) {
+        weightEl.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+    return changed;
+  }
+
   function autofill(intent, params) {
     if (!params) return;
+    if (intent === 'form_fill' && autofillFields(params.fields || {})) {
+      return;
+    }
+    if (intent === 'order_form' && autofillOrderForm(params)) {
+      return;
+    }
+    if (intent === 'stock_in_form' && autofillStockInForm(params)) {
+      return;
+    }
+    if (intent === 'sample_form' || intent === 'sample') {
+      if (autofillSampleForm(params)) return;
+    }
     const map = intent === 'stock_in' ? STOCK_IN_MAP : PRODUCTION_LOG_MAP;
 
     Object.entries(map).forEach(([key, candidates]) => {
@@ -225,6 +504,8 @@
     try {
       // 僅傳送最近 10 則訊息作為上下文
       const history = chatHistory.slice(-10);
+      const currentEntity = getCurrentEntity();
+      const fieldManifest = getFieldManifest();
       let resp;
 
       if (file) {
@@ -232,7 +513,10 @@
         const formData = new FormData();
         formData.append('text', text);
         formData.append('lang', getLang());
+        formData.append('conversation_id', getConversationId());
         formData.append('history', JSON.stringify(history));
+        if (currentEntity) formData.append('current_entity', JSON.stringify(currentEntity));
+        if (fieldManifest) formData.append('field_manifest', JSON.stringify(fieldManifest));
         formData.append('image', file);
 
         resp = await fetch('/api/ai/chat', {
@@ -251,7 +535,10 @@
           body: JSON.stringify({ 
             text, 
             lang: getLang(),
-            history: history 
+            conversation_id: getConversationId(),
+            history: history,
+            current_entity: currentEntity,
+            field_manifest: fieldManifest,
           }),
           credentials: 'same-origin',
         });
@@ -267,9 +554,26 @@
         appendMessage('ai', '⚠️ AI 模型尚未就緒，請稍後再試。/ Mô hình AI chưa sẵn sàng.');
         return;
       }
+      let data = null;
+      const contentType = resp.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await resp.json();
+      } else {
+        const rawText = await resp.text();
+        const shortText = rawText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        appendMessage('ai', `伺服器錯誤 / Lỗi máy chủ: ${shortText.slice(0, 180) || resp.statusText || 'Unexpected response'}`);
+        return;
+      }
 
-      const data = await resp.json();
-      appendMessage('ai', data.reply || '(無回應)');
+      if (!resp.ok) {
+        appendMessage('ai', data.reply || data.message || `伺服器錯誤 / Lỗi máy chủ: ${resp.status}`);
+        return;
+      }
+
+      appendMessage('ai', data.reply || '(無回應)', {
+        reasoning_summary: data.reasoning_summary || data.thinking_process || '',
+        tool_trace: data.tool_trace || [],
+      });
 
       // 自動填表
       if (data.status === 'ready' && data.intent && data.params) {

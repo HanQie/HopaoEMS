@@ -25,6 +25,7 @@ if __name__ == "__main__":
             port = int(sys.argv[1])
         except ValueError:
             pass
-            
+
+    debug = os.environ.get("FLASK_DEBUG", "").lower() in {"1", "true", "yes", "on"}
     app = create_app()
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=debug, use_reloader=debug)

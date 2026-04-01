@@ -21,6 +21,28 @@ def parse_width_to_mm(width_string):
         except ValueError:
             return None
 
+
+def infer_gram_per_yard_from_rows(roll_rows):
+    total_weight_kg = 0.0
+    total_length_m = 0.0
+    for row in roll_rows:
+        weight_kg = row.get('weight_kg')
+        length_m = row.get('length_m')
+        if weight_kg is None or length_m is None:
+            continue
+        if weight_kg <= 0 or length_m <= 0:
+            continue
+        total_weight_kg += float(weight_kg)
+        total_length_m += float(length_m)
+
+    if total_weight_kg <= 0 or total_length_m <= 0:
+        return None
+
+    total_length_yd = total_length_m / 0.9144
+    if total_length_yd <= 0:
+        return None
+    return round((total_weight_kg * 1000.0) / total_length_yd, 1)
+
 @bp.route('/')
 @auth_service.login_required
 def fabric_list():
@@ -417,11 +439,10 @@ def stock_in_commit():
         return redirect(url_for('ui_fabric.stock_in_form'))
         
     fabric = fabric_repo.get_fabric(fabric_id)
-    if not fabric or not fabric['yard_weight_gyd'] or fabric['yard_weight_gyd'] <= 0:
-        flash(t('fabric.stock_in.error.missing_gyd'), 'danger')
+    if not fabric:
+        flash(t('common.not_found'), 'danger')
         return redirect(url_for('ui_fabric.stock_in_form', fabric_id=fabric_id, cylinder_no=cylinder_no))
-        
-    gram_per_yard = fabric['yard_weight_gyd']
+
     roll_rows = []
     
     # Process dynamic rows (JS may add beyond the initial 10)
@@ -433,6 +454,7 @@ def stock_in_commit():
         i = key.replace('roll_no_', '')
         r_no = request.form.get(f'roll_no_{i}', '').strip()
         w_kg_str = request.form.get(f'weight_kg_{i}', '').strip()
+        length_m_str = request.form.get(f'length_m_{i}', '').strip()
         remark = request.form.get(f'remark_{i}', '').strip() or None
         
         # Skip empty rows
@@ -451,22 +473,44 @@ def stock_in_commit():
         except ValueError:
             flash(t('fabric.error.invalid_length') + f" (Row {i})", 'danger')
             return redirect(url_for('ui_fabric.stock_in_form', fabric_id=fabric_id, cylinder_no=cylinder_no))
-            
-        # Calculation: length_m = (weight_kg * 1000 / gram_per_yard) * 0.9144
-        # 1 yard = 0.9144 meters
-        weight_g = w_kg * 1000.0
-        length_yd = weight_g / gram_per_yard
-        length_m = length_yd * 0.9144
-        
+
+        length_m = None
+        if length_m_str:
+            try:
+                length_m = float(length_m_str)
+                if length_m <= 0:
+                    raise ValueError
+            except ValueError:
+                flash(t('fabric.error.invalid_length') + f" (Row {i})", 'danger')
+                return redirect(url_for('ui_fabric.stock_in_form', fabric_id=fabric_id, cylinder_no=cylinder_no))
+
         roll_rows.append({
             'roll_no': r_no,
-            'length_m': round(length_m, 1),
-            'remark': remark
+            'length_m': round(length_m, 1) if length_m is not None else None,
+            'weight_kg': round(w_kg, 1),
+            'remark': remark,
         })
-        
+
     if not roll_rows:
         flash(t('common.error.missing_fields'), 'danger')
         return redirect(url_for('ui_fabric.stock_in_form', fabric_id=fabric_id, cylinder_no=cylinder_no))
+
+    gram_per_yard = fabric['yard_weight_gyd']
+    if not gram_per_yard or gram_per_yard <= 0:
+        inferred_gyd = infer_gram_per_yard_from_rows(roll_rows)
+        if inferred_gyd:
+            fabric_repo.update_fabric_yard_weight(fabric_id, inferred_gyd)
+            gram_per_yard = inferred_gyd
+            flash(f"已依入庫單的公斤與米數自動回填碼重：{inferred_gyd} g/yd", 'success')
+        else:
+            flash('缺少碼重，且圖片未提供足夠米數，無法由重量單獨回推出碼重。', 'danger')
+            return redirect(url_for('ui_fabric.stock_in_form', fabric_id=fabric_id, cylinder_no=cylinder_no))
+
+    for row in roll_rows:
+        if row['length_m'] is None:
+            weight_g = row['weight_kg'] * 1000.0
+            length_yd = weight_g / gram_per_yard
+            row['length_m'] = round(length_yd * 0.9144, 1)
         
     submitted_rolls = [r['roll_no'] for r in roll_rows]
     seen = set()

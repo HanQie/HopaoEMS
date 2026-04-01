@@ -5,6 +5,31 @@
 {% import 'macros/ui/base.html' as A %}
 
 {% block content %}
+<script id="ai-field-manifest" type="application/json">
+{
+  "page_type": "order_form",
+  "entity_type": "order",
+  "fields": [
+    { "name": "order_no", "label": "{{ t('order.fields.order_no') }}", "type": "text", "aliases": ["訂單編號", "訂單號", "打單編號", "order no"] },
+    { "name": "received_date", "label": "{{ t('order.fields.received_date') }}", "type": "date", "aliases": ["接單日期", "訂單日期", "received date"] },
+    { "name": "due_date", "label": "{{ t('order.fields.due_date') }}", "type": "date", "aliases": ["預計交期", "交貨日期", "due date"] },
+    { "name": "note", "label": "{{ t('common.note') }}", "type": "textarea", "aliases": ["備註", "note"] }
+  ],
+  "groups": [
+    {
+      "name": "order_items",
+      "kind": "repeatable",
+      "aliases": ["訂單項目", "明細", "items"],
+      "row_fields": [
+        { "name": "fabric_no", "label": "{{ t('fabric.fields.code') }}", "type": "text", "aliases": ["布號", "fabric no"] },
+        { "name": "sample_id", "label": "{{ t('sample.fields.title') }}", "type": "text", "aliases": ["樣品", "sample"] },
+        { "name": "qty", "label": "{{ t('order.fields.qty') }}", "type": "number", "aliases": ["數量", "qty"] },
+        { "name": "note", "label": "{{ t('common.note') }}", "type": "text", "aliases": ["備註", "note"] }
+      ]
+    }
+  ]
+}
+</script>
 {% set header_actions %}
 {{ F.ui_button(label=t('common.back'), variant='secondary', href=url_for('ui_order.order_view', id=order.id) if order
 else url_for('ui_order.order_list'), icon='arrow-left') }}

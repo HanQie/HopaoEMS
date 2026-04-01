@@ -57,6 +57,13 @@ def update_fabric(id, fabric_code, width_mm=None, gram_per_yard=None, material_t
         (fabric_code, width_mm, gram_per_yard, material_type, remark, id)
     )
 
+
+def update_fabric_yard_weight(fabric_id, gram_per_yard):
+    execute_db(
+        'UPDATE fabrics SET yard_weight_gyd = ? WHERE id = ?',
+        (gram_per_yard, fabric_id)
+    )
+
 def list_cylinders(fabric_id):
     return query_db('SELECT * FROM cylinders WHERE fabric_id = ? ORDER BY cylinder_no', (fabric_id,))
 

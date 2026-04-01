@@ -20,7 +20,13 @@ HopaoUI.register('fabric_stock_in', () => {
     const updateRow = (row, gyd) => {
         const kgInput = row.querySelector('[data-hook="fabric-stockin-kg"]');
         const lengthDisplay = row.querySelector('[data-hook="fabric-stockin-length"]');
-        if (!kgInput || !lengthDisplay) return;
+        const lengthInput = row.querySelector('[data-hook="fabric-stockin-length-input"]');
+        if (!kgInput || !lengthDisplay || !lengthInput) return;
+        const explicitLength = parseFloat(lengthInput.value);
+        if (!Number.isNaN(explicitLength) && explicitLength > 0) {
+            lengthDisplay.textContent = explicitLength.toFixed(1).replace(/\.0$/, '') + ' m';
+            return;
+        }
         const length = calculateLength(parseFloat(kgInput.value), gyd);
         lengthDisplay.textContent = length ? length + ' m' : '-';
     };
@@ -67,9 +73,11 @@ HopaoUI.register('fabric_stock_in', () => {
                 const rollInput = clone.querySelector('[data-hook="fabric-stockin-rollno"]');
                 const kgInput = clone.querySelector('[data-hook="fabric-stockin-kg"]');
                 const remarkInput = clone.querySelector('[data-hook="fabric-stockin-remark"]');
+                const lengthInput = clone.querySelector('[data-hook="fabric-stockin-length-input"]');
                 if (rollInput) rollInput.value = data.roll_no || '';
                 if (kgInput) kgInput.value = data.weight_kg !== undefined ? data.weight_kg : '';
                 if (remarkInput) remarkInput.value = data.remark || '';
+                if (lengthInput) lengthInput.value = data.length_m !== undefined ? data.length_m : '';
             }
 
             tbody.appendChild(clone);

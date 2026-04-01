@@ -8,9 +8,14 @@ ollama>=0.2.0
 
 # ----- 圖片處理 -----
 Pillow>=10.0.0
+opencv-python-headless>=4.13.0
 
 # ----- Phase 3: 圖片向量化（CLIP，CPU 可用，無需 GPU）-----
 sentence-transformers>=2.6.0
+
+# ----- OCR（本地 ONNX）-----
+rapidocr-onnxruntime>=1.4.4
+onnxruntime>=1.20.0
 
 # ----- 數值計算 -----
 numpy>=1.24.0,<2.0.0
